@@ -1,0 +1,36 @@
+{
+  "name": "push.az — Osobyy Reminder",
+  "short_name": "push.az",
+  "description": "Personal'nyy PWA-reminder s push-uvedomleniyami",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Novyy reminder",
+      "short_name": "Novyy",
+      "url": "/?action=new",
+      "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

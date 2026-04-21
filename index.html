@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="push.az — PWA-reminder s push-uvedomleniyami" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="push.az" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <title>push.az — Osobyy Reminder</title>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>push.az</h1>
+          <p class="tagline">Osobyy reminder</p>
+        </div>
+      </div>
+      <button id="permission-btn" class="btn btn-ghost" hidden>
+        <span class="dot"></span> Razreshit' uvedomleniya
+      </button>
+    </header>
+
+    <section id="status-banner" class="banner" hidden></section>
+
+    <main class="app-main">
+      <section class="composer card">
+        <h2 class="section-title">Novyy reminder</h2>
+        <form id="reminder-form" class="form" autocomplete="off">
+          <label class="field">
+            <span>Nazvaniye</span>
+            <input
+              id="title"
+              name="title"
+              type="text"
+              maxlength="80"
+              placeholder="Naprimer: Prinyat' lekarstvo"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span>Zametka (neobyazatel'no)</span>
+            <textarea
+              id="note"
+              name="note"
+              rows="2"
+              maxlength="280"
+              placeholder="Podrobnosti, ssylka, kontekst..."
+            ></textarea>
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Data i vremya</span>
+              <input id="when" name="when" type="datetime-local" required />
+            </label>
+
+            <label class="field">
+              <span>Povtor</span>
+              <select id="repeat" name="repeat">
+                <option value="none">Bez povtora</option>
+                <option value="daily">Kazhdyy den'</option>
+                <option value="weekly">Kazhduyu nedelyu</option>
+                <option value="monthly">Kazhdyy mesyats</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="reset-btn" class="btn btn-ghost">Sbrosit'</button>
+            <button type="submit" class="btn btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Dobavit'
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="reminders">
+        <div class="reminders-header">
+          <h2 class="section-title">Predstoyashchiye</h2>
+          <span id="count-badge" class="badge">0</span>
+        </div>
+        <ul id="reminders-list" class="reminders-list"></ul>
+        <div id="empty-state" class="empty-state card" hidden>
+          <div class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <h3>Poka pusto</h3>
+          <p>Sozday svoy pervyy reminder vyshe — uvedomleniye pridyot vovremya.</p>
+        </div>
+      </section>
+
+      <section class="past card" id="past-section" hidden>
+        <details>
+          <summary class="section-title">Arkhiv (proshedshiye)</summary>
+          <ul id="past-list" class="reminders-list compact"></ul>
+        </details>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <small>
+        push.az · <span id="install-hint" hidden>Ustanovi cherez menyu brauzera →</span>
+        <a href="#" id="test-notification">Test-uvedomleniye</a>
+      </small>
+    </footer>
+  </div>
+
+  <template id="reminder-item-template">
+    <li class="reminder-item card">
+      <div class="reminder-main">
+        <div class="reminder-header">
+          <h3 class="reminder-title"></h3>
+          <span class="reminder-repeat tag" hidden></span>
+        </div>
+        <p class="reminder-note" hidden></p>
+        <p class="reminder-when">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <time class="reminder-time"></time>
+          <span class="reminder-relative"></span>
+        </p>
+      </div>
+      <div class="reminder-actions">
+        <button class="icon-btn" data-action="snooze" title="Otlozhit' na 10 minut" aria-label="Otlozhit'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="13" r="8"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/></svg>
+        </button>
+        <button class="icon-btn icon-btn-danger" data-action="delete" title="Udalit'" aria-label="Udalit'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </button>
+      </div>
+    </li>
+  </template>
+
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
