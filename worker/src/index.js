@@ -349,7 +349,9 @@ async function handleTestPush(request, env, ctx) {
   if (!vapid) return jsonResponse({ error: 'VAPID not configured' }, 500, request, env);
 
   const testReminder = { id: 'test', title: 'Test push.az', note: '', tone: 'friendly' };
-  const body = await buildPushBody(env, testReminder, 1);
+  // Dlya test-pusha srazu pokazyvayem challenge chtoby protestit' funktsiyu
+  const built = await buildPushBody(env, testReminder, 2);
+  const pendingCount = await countPendingReminders(env, deviceId);
 
   const result = await sendWebPush(
     {
@@ -360,13 +362,29 @@ async function handleTestPush(request, env, ctx) {
     {
       type: 'test',
       title: 'push.az',
-      body,
+      body: built.text,
+      challenge: built.challenge,
       reminderId: 'test',
+      pendingCount,
     },
     vapid,
   );
 
-  return jsonResponse({ ok: result.ok, status: result.status, body }, result.ok ? 200 : 502, request, env);
+  return jsonResponse({ ok: result.ok, status: result.status, body: built.text, challenge: built.challenge }, result.ok ? 200 : 502, request, env);
+}
+
+async function countPendingReminders(env, deviceId) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM reminders
+       WHERE device_id = ?1 AND status = 'active' AND fire_at <= ?2`,
+    )
+      .bind(deviceId, Date.now())
+      .first();
+    return Number(row?.c || 0);
+  } catch {
+    return 0;
+  }
 }
 
 // ============================================================================
@@ -424,7 +442,8 @@ async function processOneReminder(env, r, vapid, now) {
   }
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone };
-  const body = await buildPushBody(env, reminder, attempt);
+  const built = await buildPushBody(env, reminder, attempt);
+  const pendingCount = await countPendingReminders(env, r.device_id);
 
   const result = await sendWebPush(
     { endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth },
@@ -432,11 +451,13 @@ async function processOneReminder(env, r, vapid, now) {
       type: 'reminder',
       reminderId: r.id,
       title: r.title,
-      body,
+      body: built.text,
+      challenge: built.challenge,
       attempt,
       maxAttempts: MAX_ATTEMPTS,
       fireAt: r.fire_at,
       tone: r.tone,
+      pendingCount,
     },
     vapid,
     { ttl: 60, urgency: 'high', topic: 'r-' + r.id },
@@ -451,7 +472,7 @@ async function processOneReminder(env, r, vapid, now) {
       r.device_id,
       now,
       attempt,
-      body,
+      built.text,
       result.status,
       result.ok ? null : String(result.body || '').slice(0, 500),
     )

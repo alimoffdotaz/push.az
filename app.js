@@ -387,9 +387,11 @@ function render() {
   const now = Date.now();
   const upcoming = [];
   const past = [];
+  let overdue = 0;
   for (const r of state.reminders) {
     if (r.fireAt >= now - 60 * 1000 || r.repeat !== 'none') upcoming.push(r);
     else past.push(r);
+    if (r.fireAt <= now && !r.acked) overdue++;
   }
 
   listEl.innerHTML = '';
@@ -404,6 +406,28 @@ function render() {
   } else {
     pastSection.hidden = true;
   }
+
+  updateAppBadge(overdue);
+}
+
+// ============================================================================
+// App Badge API \u2014 schyotchik prosrochennykh na ikonke PWA
+// ============================================================================
+
+async function updateAppBadge(count) {
+  try {
+    if (count > 0 && navigator.setAppBadge) {
+      await navigator.setAppBadge(count);
+    } else if (navigator.clearAppBadge) {
+      await navigator.clearAppBadge();
+    }
+  } catch {
+    // unsupported \u2014 ignore
+  }
+  // Takzhe podgonyaem titul (chtoby v Safari bylo vidno)
+  try {
+    document.title = count > 0 ? `(${count}) push.az` : 'push.az';
+  } catch {}
 }
 
 function renderItem(r, isPast = false) {
