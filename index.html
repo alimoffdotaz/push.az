@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
-  <meta name="description" content="push.az \u2014 anti banner-blindness reminder s unikal'nymi pushami" />
+  <meta name="description" content="push.az — anti banner-blindness reminder s unikal'nymi pushami" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="push.az" />
@@ -12,7 +13,7 @@
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
   <link rel="apple-touch-icon" href="/icons/icon.svg" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>push.az \u2014 Osobyy Reminder</title>
+  <title>push.az — Osobyy Reminder</title>
 </head>
 <body>
   <div class="app">
@@ -26,13 +27,13 @@
         </div>
         <div class="brand-text">
           <h1>push.az</h1>
-          <p class="tagline">Osobyy reminder \u00b7 unikal\u2019nyy push kazhdyy raz</p>
+          <p class="tagline">Osobyy reminder · unikal’nyy push kazhdyy raz</p>
         </div>
       </div>
       <div class="header-actions">
         <span id="push-status-pill" class="pill pill-muted">Offline rezhim</span>
         <button id="permission-btn" class="btn btn-ghost" hidden>
-          <span class="dot"></span> Razreshit\u2019
+          <span class="dot"></span> Razreshit’
         </button>
         <button id="settings-btn" class="icon-btn" aria-label="Nastroyki" title="Nastroyki">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -49,11 +50,11 @@
           <label class="field">
             <span>Nazvaniye</span>
             <input id="title" name="title" type="text" maxlength="80"
-              placeholder="Naprimer: Prinyat\u2019 lekarstvo" required />
+              placeholder="Naprimer: Prinyat’ lekarstvo" required />
           </label>
 
           <label class="field">
-            <span>Zametka (neobyazatel\u2019no)</span>
+            <span>Zametka (neobyazatel’no)</span>
             <textarea id="note" name="note" rows="2" maxlength="280"
               placeholder="Podrobnosti, ssylka, kontekst..."></textarea>
           </label>
@@ -68,7 +69,7 @@
               <span>Povtor</span>
               <select id="repeat" name="repeat">
                 <option value="none">Bez povtora</option>
-                <option value="daily">Kazhdyy den\u2019</option>
+                <option value="daily">Kazhdyy den’</option>
                 <option value="weekly">Kazhduyu nedelyu</option>
                 <option value="monthly">Kazhdyy mesyats</option>
               </select>
@@ -78,21 +79,21 @@
           <label class="field">
             <span>Ton uvedomleniy</span>
             <select id="tone" name="tone">
-              <option value="friendly">\ud83d\udc9c Teplo \u2014 podderzhivayushche, bez davleniya</option>
-              <option value="urgent">\u26a1 Srochno \u2014 kratko i naporno</option>
-              <option value="funny">\ud83d\ude06 Smeshno \u2014 s yumorom</option>
-              <option value="aggressive">\ud83d\udd25 Zhyostko \u2014 kak strogiy trener</option>
+              <option value="friendly">💜 Teplo — podderzhivayushche, bez davleniya</option>
+              <option value="urgent">⚡ Srochno — kratko i naporno</option>
+              <option value="funny">😆 Smeshno — s yumorom</option>
+              <option value="aggressive">🔥 Zhyostko — kak strogiy trener</option>
             </select>
           </label>
 
           <div class="form-actions">
-            <button type="button" id="reset-btn" class="btn btn-ghost">Sbrosit\u2019</button>
+            <button type="button" id="reset-btn" class="btn btn-ghost">Sbrosit’</button>
             <button type="submit" class="btn btn-primary">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              Dobavit\u2019
+              Dobavit’
             </button>
           </div>
         </form>
@@ -111,7 +112,7 @@
             </svg>
           </div>
           <h3>Poka pusto</h3>
-          <p>Sozday svoy pervyy reminder vyshe \u2014 push pridyot vovremya, i kazhdyy raz s drugim tekstom.</p>
+          <p>Sozday svoy pervyy reminder vyshe — push pridyot vovremya, i kazhdyy raz s drugim tekstom.</p>
         </div>
       </section>
 
@@ -125,7 +126,7 @@
 
     <footer class="app-footer">
       <small>
-        push.az \u00b7 <span id="install-hint" hidden></span>
+        push.az · <span id="install-hint" hidden></span>
         <a href="#" id="test-notification">Test-uvedomleniye</a>
       </small>
     </footer>
@@ -142,10 +143,10 @@
       <div id="takeover-counter" class="takeover-counter" hidden></div>
       <div class="takeover-actions">
         <button id="takeover-done" class="takeover-btn takeover-btn-primary">
-          \u2713 Gotovo
+          ✓ Gotovo
         </button>
         <button id="takeover-snooze" class="takeover-btn takeover-btn-secondary">
-          Otlozhit\u2019 na 10 min
+          Otlozhit’ na 10 min
         </button>
         <button id="takeover-skip" class="takeover-btn takeover-btn-ghost">
           Pozzhe
@@ -159,7 +160,7 @@
     <form id="settings-form" class="settings-form" method="dialog">
       <header class="settings-header">
         <h3>Nastroyki</h3>
-        <button type="button" class="icon-btn" data-close-settings aria-label="Zakryt\u2019">
+        <button type="button" class="icon-btn" data-close-settings aria-label="Zakryt’">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </header>
@@ -170,16 +171,16 @@
           autocomplete="off" spellcheck="false" />
       </label>
       <p class="hint">
-        Otkroy <code>tools/vapid-gen.html</code> chtoby sgenerirovat\u2019 VAPID klyuchi,
-        potom zadeploy Worker (papka <code>worker/</code>) i vstav\u2019 yego URL syuda.
-        Bez URL app rabotayet lokal\u2019no i push prikhodit tol\u2019ko poka app otkryt.
+        Otkroy <code>tools/vapid-gen.html</code> chtoby sgenerirovat’ VAPID klyuchi,
+        potom zadeploy Worker (papka <code>worker/</code>) i vstav’ yego URL syuda.
+        Bez URL app rabotayet lokal’no i push prikhodit tol’ko poka app otkryt.
       </p>
 
       <div id="settings-status" class="settings-status"></div>
 
       <footer class="settings-actions">
-        <button type="button" class="btn btn-ghost" data-close-settings>Otmenit\u2019</button>
-        <button type="submit" class="btn btn-primary">Sokhranit\u2019</button>
+        <button type="button" class="btn btn-ghost" data-close-settings>Otmenit’</button>
+        <button type="submit" class="btn btn-primary">Sokhranit’</button>
       </footer>
     </form>
   </dialog>
@@ -202,10 +203,10 @@
         </p>
       </div>
       <div class="reminder-actions">
-        <button class="icon-btn" data-action="snooze" title="Otlozhit\u2019 10 min" aria-label="Otlozhit\u2019">
+        <button class="icon-btn" data-action="snooze" title="Otlozhit’ 10 min" aria-label="Otlozhit’">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="13" r="8"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/></svg>
         </button>
-        <button class="icon-btn icon-btn-danger" data-action="delete" title="Udalit\u2019" aria-label="Udalit\u2019">
+        <button class="icon-btn icon-btn-danger" data-action="delete" title="Udalit’" aria-label="Udalit’">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
         </button>
       </div>
