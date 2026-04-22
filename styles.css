@@ -669,6 +669,19 @@ a:hover {
 .settings-status.success { color: #86efac; }
 .settings-status.error { color: #fca5a5; }
 
+.settings-diagnostics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+
+.btn-small {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
 .settings-actions {
   display: flex;
   justify-content: flex-end;

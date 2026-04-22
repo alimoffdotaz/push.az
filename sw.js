@@ -133,10 +133,18 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  // Badge API: na iOS PWA ikonka pokazyvaet chislo. Yesli push \u2014 eto
+  // reminder (ili test), stavim min 1. Yesli backend peredal
+  // pendingCount > 0 \u2014 ispol'zuem ego.
+  let badgeCount = 0;
+  if (isReminder || data.type === 'test') {
+    badgeCount = pendingCount > 0 ? pendingCount : 1;
+  }
+
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(title, options),
-      setBadge(pendingCount),
+      setBadge(badgeCount),
     ]),
   );
 });

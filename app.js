@@ -984,6 +984,42 @@ function bindEvents() {
 
   if (takeoverSnooze) takeoverSnooze.addEventListener('click', takeoverSnoozeAction);
 
+  const testBadgeBtn = document.getElementById('test-badge-btn');
+  const clearBadgeBtn = document.getElementById('clear-badge-btn');
+  const testChallengeBtn = document.getElementById('test-challenge-btn');
+
+  if (testBadgeBtn) {
+    testBadgeBtn.addEventListener('click', async () => {
+      if (!('setAppBadge' in navigator)) {
+        toast('Badge API ne podderzhivaetsya na etom ustroystve', 'error');
+        return;
+      }
+      try {
+        await navigator.setAppBadge(3);
+        toast('Badge = 3 \u2014 posmotri na ikonku na home screen', 'success');
+      } catch (err) {
+        toast('Ne udalos\u2019: ' + (err?.message || err), 'error');
+      }
+    });
+  }
+
+  if (clearBadgeBtn) {
+    clearBadgeBtn.addEventListener('click', async () => {
+      try {
+        if (navigator.clearAppBadge) await navigator.clearAppBadge();
+        toast('Badge sbroshen', 'success');
+      } catch {}
+    });
+  }
+
+  if (testChallengeBtn) {
+    testChallengeBtn.addEventListener('click', () => {
+      if (settingsDialog.close) settingsDialog.close();
+      else settingsDialog.hidden = true;
+      setTimeout(() => showTakeoverForTest(), 300);
+    });
+  }
+
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible') {
       tickUpdate();
