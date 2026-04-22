@@ -20,7 +20,7 @@ crons = ["* * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "push-az-db"
-database_id = "REPLACE_WITH_D1_ID_FROM_DASHBOARD"
+database_id = "122ed4b8-cf61-4b27-9584-6bef7e005362"
 
 # ============================================================================
 # Workers AI — dlya generatsii unikal'nykh tekstov uvedomleniy
