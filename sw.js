@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v3';
+const CACHE = 'push-az-v4';
 const ASSETS = [
   '/',
   '/index.html',
@@ -11,6 +11,12 @@ const ASSETS = [
   '/icons/icon.svg',
   '/icons/icon-maskable.svg',
   '/icons/icon-alert.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-256.png',
+  '/icons/icon-512.png',
+  '/icons/icon-alert-512.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/favicon-64.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -102,8 +108,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || 'Vremya!',
-    icon: urgent ? '/icons/icon-alert.svg' : '/icons/icon.svg',
-    badge: '/icons/icon.svg',
+    icon: urgent ? '/icons/icon-alert-512.png' : '/icons/icon-512.png',
+    badge: '/icons/icon-192.png',
     tag: 'push-az-' + (reminderId || 'generic'),
     renotify: true,
     requireInteraction: true,

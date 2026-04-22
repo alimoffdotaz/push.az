@@ -669,6 +669,111 @@ a:hover {
 .settings-status.success { color: #86efac; }
 .settings-status.error { color: #fca5a5; }
 
+.install-banner {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(236, 72, 153, 0.12));
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.install-banner-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.install-banner-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e0e7ff;
+}
+
+.install-banner-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.install-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.install-banner-text strong {
+  font-size: 15px;
+  color: #fff;
+}
+
+.install-banner-text span {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.install-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.install-instructions {
+  margin-top: 14px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.install-instructions strong {
+  color: #fff;
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.install-instructions ol {
+  margin: 4px 0 0 20px;
+  padding: 0;
+}
+
+.install-instructions li {
+  margin: 3px 0;
+}
+
+.install-instructions kbd {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fbcfe8;
+}
+
+@media (max-width: 520px) {
+  .install-banner-body {
+    flex-wrap: wrap;
+  }
+  .install-banner-text {
+    flex-basis: calc(100% - 52px);
+  }
+  .install-banner-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+}
+
 .settings-diagnostics {
   display: flex;
   flex-wrap: wrap;

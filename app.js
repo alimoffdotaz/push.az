@@ -936,26 +936,177 @@ function handleURLAction() {
   }
 }
 
+// ============================================================================
+// Install banner + platform detection
+// ============================================================================
+
 let deferredInstall = null;
+const INSTALL_DISMISS_KEY = 'push_az_install_dismissed';
+
+function isStandalone() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+    window.matchMedia('(display-mode: minimal-ui)').matches ||
+    // iOS-specific
+    window.navigator.standalone === true
+  );
+}
+
+function detectPlatform() {
+  const ua = navigator.userAgent;
+  const isMac = /Macintosh|Mac OS X/.test(ua) && !/iPhone|iPad|iPod/.test(ua);
+  const isIOS = /iPhone|iPad|iPod/.test(ua) || (isMac && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(ua);
+  const isSafari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|EdgiOS/.test(ua);
+  const isChromium = /Chrome|Chromium|Brave|Edg|OPR/.test(ua);
+  const isFirefox = /Firefox/.test(ua);
+  return { isMac, isIOS, isAndroid, isSafari, isChromium, isFirefox };
+}
+
+function getInstallInstructions() {
+  const p = detectPlatform();
+  if (p.isIOS && !p.isMac) {
+    return {
+      title: 'iPhone / iPad — Safari',
+      steps: [
+        'Vnizu (ili sprava sverkhu) nazhmi <kbd>Share</kbd> \u2014 kvadratik so strelkoy vverkh.',
+        'V menyu prolistay i vyberi <kbd>Add to Home Screen</kbd>.',
+        'Nazhmi <kbd>Add</kbd>.',
+        'Otkroy push.az s home screen (ne iz Safari).',
+      ],
+    };
+  }
+  if (p.isMac && p.isSafari) {
+    return {
+      title: 'Mac \u2014 Safari (macOS 14+)',
+      steps: [
+        'V menyu sverkhu: <kbd>File</kbd> \u2192 <kbd>Add to Dock...</kbd>',
+        'Nazhmi <kbd>Add</kbd>.',
+        'Otkroy push.az iz Dock.',
+        'V System Settings \u2192 Notifications poyavitsya push.az.',
+      ],
+    };
+  }
+  if (p.isMac && p.isChromium) {
+    return {
+      title: 'Mac \u2014 Chrome / Brave / Edge / Arc',
+      steps: [
+        'V adresnoy stroke sprava nazhmi ikonku <kbd>Install</kbd> (monitor so strelkoy vniz).',
+        'Ili \u2014 menyu <kbd>\u2026</kbd> \u2192 <kbd>Install push.az</kbd>.',
+        'Nazhmi <kbd>Install</kbd>.',
+        'Otkroy push.az iz Launchpad / Applications.',
+      ],
+    };
+  }
+  if (p.isAndroid && p.isChromium) {
+    return {
+      title: 'Android \u2014 Chrome',
+      steps: [
+        'Menyu <kbd>\u22ee</kbd> sverkhu sprava.',
+        'Vyberi <kbd>Install app</kbd> ili <kbd>Add to Home screen</kbd>.',
+        'Podtverdi.',
+      ],
+    };
+  }
+  if (p.isFirefox) {
+    return {
+      title: 'Firefox',
+      steps: [
+        'Firefox pokhka ne podderzhivaet PWA na desktop polnost\u2019yu.',
+        'Ispol\u2019zuy Chrome, Brave, Edge ili Safari dlya ustanovki.',
+      ],
+    };
+  }
+  return {
+    title: 'Ustanovka',
+    steps: [
+      'V tvoyem brauzere poyavitsya ikonka "Install" v adresnoy stroke libo v menyu.',
+      'Nazhmi yeyo, potom <kbd>Install</kbd>.',
+      'Otkroy push.az kak otdel\u2019noye prilozheniye.',
+    ],
+  };
+}
+
+function renderInstallInstructions() {
+  const el = document.getElementById('install-instructions');
+  if (!el) return;
+  const info = getInstallInstructions();
+  el.innerHTML =
+    `<strong>${info.title}</strong><ol>` +
+    info.steps.map((s) => `<li>${s}</li>`).join('') +
+    '</ol>';
+}
+
+function updateInstallBannerVisibility() {
+  const banner = document.getElementById('install-banner');
+  if (!banner) return;
+
+  const dismissed = localStorage.getItem(INSTALL_DISMISS_KEY) === '1';
+  if (isStandalone() || dismissed) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+
+  const installBtn = document.getElementById('install-btn');
+  if (installBtn) installBtn.hidden = !deferredInstall;
+}
+
+function setupInstallBanner() {
+  const installBtn = document.getElementById('install-btn');
+  const howBtn = document.getElementById('install-how-btn');
+  const dismissBtn = document.getElementById('install-dismiss-btn');
+  const instructions = document.getElementById('install-instructions');
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstall) return;
+      deferredInstall.prompt();
+      try {
+        const { outcome } = await deferredInstall.userChoice;
+        if (outcome === 'accepted') {
+          toast('Ustanovleno \u2713', 'success');
+          localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+          updateInstallBannerVisibility();
+        }
+      } catch {}
+      deferredInstall = null;
+    });
+  }
+
+  if (howBtn) {
+    howBtn.addEventListener('click', () => {
+      renderInstallInstructions();
+      if (instructions) instructions.hidden = !instructions.hidden;
+    });
+  }
+
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => {
+      localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+      updateInstallBannerVisibility();
+    });
+  }
+
+  updateInstallBannerVisibility();
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstall = e;
-  installHint.hidden = false;
-  installHint.textContent = '';
-  const link = document.createElement('a');
-  link.href = '#';
-  link.textContent = 'Ustanovit\u2019 prilozheniye';
-  link.addEventListener('click', async (ev) => {
-    ev.preventDefault();
-    if (!deferredInstall) return;
-    deferredInstall.prompt();
-    const { outcome } = await deferredInstall.userChoice;
-    if (outcome === 'accepted') toast('Ustanovleno', 'success');
-    deferredInstall = null;
-    installHint.hidden = true;
-  });
-  installHint.appendChild(link);
+  updateInstallBannerVisibility();
 });
+
+window.addEventListener('appinstalled', () => {
+  deferredInstall = null;
+  localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+  updateInstallBannerVisibility();
+  toast('push.az ustanovlen \u2713', 'success');
+});
+
+// Otslezhivaem transition standalone mode
+window.matchMedia('(display-mode: standalone)').addEventListener?.('change', updateInstallBannerVisibility);
 
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
@@ -1051,6 +1202,7 @@ function bindEvents() {
   setupSWMessageHandler();
   await load();
   bindEvents();
+  setupInstallBanner();
   updatePushStatusPill();
   await updatePermissionUI();
 

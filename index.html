@@ -11,7 +11,10 @@
   <meta name="apple-mobile-web-app-title" content="push.az" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
-  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+  <link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon-64.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="/styles.css" />
   <title>push.az — Osobyy Reminder</title>
 </head>
@@ -42,6 +45,32 @@
     </header>
 
     <section id="status-banner" class="banner" hidden></section>
+
+    <section id="install-banner" class="install-banner card" hidden>
+      <div class="install-banner-body">
+        <div class="install-banner-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v13" /><polyline points="7 11 12 16 17 11" /><path d="M5 21h14" />
+          </svg>
+        </div>
+        <div class="install-banner-text">
+          <strong>Ustanovi push.az</strong>
+          <span id="install-banner-hint">Chtoby push rabotal nadyozhno i v uvedomleniyakh OS poyavilsya push.az.</span>
+        </div>
+        <div class="install-banner-actions">
+          <button type="button" id="install-btn" class="btn btn-primary btn-small" hidden>
+            Ustanovit’
+          </button>
+          <button type="button" id="install-how-btn" class="btn btn-ghost btn-small">
+            Kak?
+          </button>
+          <button type="button" id="install-dismiss-btn" class="icon-btn" aria-label="Zakryt’">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="install-instructions" class="install-instructions" hidden></div>
+    </section>
 
     <main class="app-main">
       <section class="composer card">
