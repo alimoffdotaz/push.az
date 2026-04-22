@@ -439,7 +439,7 @@ async function processOneReminder(env, r, vapid, now) {
       tone: r.tone,
     },
     vapid,
-    { ttl: 60, urgency: attempt >= 3 ? 'high' : 'normal', topic: 'r-' + r.id },
+    { ttl: 60, urgency: 'high', topic: 'r-' + r.id },
   );
 
   await env.DB.prepare(
