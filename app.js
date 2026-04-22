@@ -52,9 +52,10 @@ const takeoverEl = $('#takeover');
 const takeoverTitle = $('#takeover-title');
 const takeoverNote = $('#takeover-note');
 const takeoverCounter = $('#takeover-counter');
-const takeoverDone = $('#takeover-done');
 const takeoverSnooze = $('#takeover-snooze');
-const takeoverSkip = $('#takeover-skip');
+const takeoverChallengePrompt = $('#takeover-challenge-prompt');
+const takeoverChallengeButtons = $('#takeover-challenge-buttons');
+const takeoverChallengeHint = $('#takeover-challenge-hint');
 
 // ============================================================================
 // Constants
@@ -617,6 +618,7 @@ function showTakeover(r, totalCount) {
   takeoverEl.dataset.reminderId = r.id;
   takeoverEl.hidden = false;
   takeoverEl.classList.add('active');
+  renderChallenge(false);
   if (navigator.vibrate) {
     try { navigator.vibrate([120, 60, 120, 60, 200]); } catch {}
   }
@@ -630,7 +632,65 @@ function hideTakeover() {
   setTimeout(() => checkTakeover(), 400);
 }
 
-async function takeoverDoneAction() {
+// Challenge: 3 knopki, odnu pravil'naya
+function generateChallenge() {
+  const digits = [2, 3, 4, 5, 6, 7, 8, 9];
+  const pool = digits.slice();
+  const picks = [];
+  for (let i = 0; i < 3; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picks.push(pool.splice(idx, 1)[0]);
+  }
+  const correct = picks[Math.floor(Math.random() * picks.length)];
+  return { buttons: picks, correct };
+}
+
+function renderChallenge(wrongAttempt) {
+  const ch = generateChallenge();
+  takeoverEl.dataset.correctDigit = String(ch.correct);
+
+  const promptPhrases = [
+    (n) => `Nazhmi <strong>${n}</strong> chtoby zakryt\u2019`,
+    (n) => `Chtoby podtverdit\u2019 \u2014 tap na <strong>${n}</strong>`,
+    (n) => `Prochel? Nazhmi <strong>${n}</strong>`,
+    (n) => `Tsifra <strong>${n}</strong> \u2014 i svoboden`,
+  ];
+  const phrase = promptPhrases[Math.floor(Math.random() * promptPhrases.length)](ch.correct);
+  takeoverChallengePrompt.innerHTML = phrase;
+
+  takeoverChallengeButtons.innerHTML = '';
+  ch.buttons.forEach((d) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'takeover-challenge-btn';
+    btn.textContent = String(d);
+    btn.dataset.digit = String(d);
+    btn.addEventListener('click', () => handleChallengeTap(d, btn));
+    takeoverChallengeButtons.appendChild(btn);
+  });
+
+  if (wrongAttempt) {
+    takeoverChallengeHint.textContent = 'Ne tak. Prochti vnimatel\u2019no.';
+    takeoverChallengeHint.hidden = false;
+  } else {
+    takeoverChallengeHint.hidden = true;
+  }
+}
+
+async function handleChallengeTap(digit, btnEl) {
+  const correct = Number(takeoverEl.dataset.correctDigit);
+  if (digit === correct) {
+    btnEl.classList.add('correct');
+    if (navigator.vibrate) { try { navigator.vibrate(60); } catch {} }
+    await takeoverConfirmDone();
+    return;
+  }
+  btnEl.classList.add('wrong');
+  if (navigator.vibrate) { try { navigator.vibrate([200, 80, 200]); } catch {} }
+  setTimeout(() => renderChallenge(true), 450);
+}
+
+async function takeoverConfirmDone() {
   const id = takeoverEl.dataset.reminderId;
   if (!id) return hideTakeover();
   const r = state.reminders.find((x) => x.id === id);
@@ -649,10 +709,6 @@ async function takeoverSnoozeAction() {
   const id = takeoverEl.dataset.reminderId;
   if (!id) return hideTakeover();
   await snoozeReminder(id, 10);
-  hideTakeover();
-}
-
-function takeoverSkipAction() {
   hideTakeover();
 }
 
@@ -796,15 +852,43 @@ function setupSWMessageHandler() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.addEventListener('message', async (event) => {
     const msg = event.data || {};
-    if (msg.type === 'reminder-acked') {
-      const { reminderId, action } = msg;
+    const { reminderId, action } = msg;
+
+    if (msg.type === 'open-challenge') {
+      // Pol'zovatel' tapnul na push \u2014 prinuditelьno pokazhem takeover
+      if (!reminderId || reminderId === 'test') {
+        // Dlya test-pusha prosto pokazyvaem challenge-demo
+        showTakeoverForTest();
+        return;
+      }
+      const r = state.reminders.find((x) => x.id === reminderId);
+      if (r) {
+        if (state.takeoverActive) hideTakeover();
+        showTakeover(r, 1);
+      } else {
+        // Esli reminder uzhe udalyon \u2014 prosto perezagruzim, mozhet byt' sinkhroniziruyetsya
+        await load();
+        checkTakeover();
+      }
+      return;
+    }
+
+    if (msg.type === 'reminder-snoozed') {
       if (!reminderId || reminderId === 'test') return;
-      if (action === 'done') {
-        await db.delete(reminderId);
-        state.reminders = state.reminders.filter((r) => r.id !== reminderId);
+      const r = state.reminders.find((x) => x.id === reminderId);
+      if (r) {
+        r.fireAt = Date.now() + 10 * 60000;
+        await db.put(r);
         render();
-        if (state.takeoverActive && takeoverEl?.dataset.reminderId === reminderId) hideTakeover();
-      } else if (action === 'snooze') {
+      }
+      if (state.takeoverActive && takeoverEl?.dataset.reminderId === reminderId) hideTakeover();
+      return;
+    }
+
+    // Legacy: esli pridyot staroye soobshcheniye reminder-acked \u2014 obrabotay tak zhe
+    if (msg.type === 'reminder-acked') {
+      if (!reminderId || reminderId === 'test') return;
+      if (action === 'snooze') {
         const r = state.reminders.find((x) => x.id === reminderId);
         if (r) {
           r.fireAt = Date.now() + 10 * 60000;
@@ -814,6 +898,19 @@ function setupSWMessageHandler() {
       }
     }
   });
+}
+
+function showTakeoverForTest() {
+  const fake = { id: 'test', title: 'Test challenge', note: 'Nazhmi pravil\u2019nuyu tsifru chtoby zakryt\u2019.' };
+  state.takeoverActive = true;
+  takeoverTitle.textContent = fake.title;
+  takeoverNote.textContent = fake.note;
+  takeoverNote.hidden = false;
+  takeoverCounter.hidden = true;
+  takeoverEl.dataset.reminderId = 'test';
+  takeoverEl.hidden = false;
+  takeoverEl.classList.add('active');
+  renderChallenge(false);
 }
 
 // ============================================================================
@@ -885,9 +982,7 @@ function bindEvents() {
     b.addEventListener('click', closeSettings),
   );
 
-  if (takeoverDone) takeoverDone.addEventListener('click', takeoverDoneAction);
   if (takeoverSnooze) takeoverSnooze.addEventListener('click', takeoverSnoozeAction);
-  if (takeoverSkip) takeoverSkip.addEventListener('click', takeoverSkipAction);
 
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible') {

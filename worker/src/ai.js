@@ -167,36 +167,21 @@ export async function generateAIText(ai, reminder, attempt) {
 // Yesli nepravil\u2019nuyu \u2014 ne akaem, push re-fire'itsya cherez 1-2 min.
 // ============================================================================
 
-const CHALLENGE_PHRASES = [
-  (n) => `Hold push \u2192 nazhmi knopku [${n}]`,
-  (n) => `Long-press \u2192 [${n}]`,
-  (n) => `Chtoby zakryt': long-press i [${n}]`,
-  (n) => `Derzhi push, nazhmi [${n}]`,
-  (n) => `Long-press i tap [${n}] \u2014 i svoboden`,
+const OPEN_HINTS = [
+  'Tap \u2192 podtverdi v app',
+  'Otkroy app chtoby zakryt\u2019',
+  'Tap, chtob zavershit\u2019',
+  'Podtverdi v prilozhenii',
+  'Open app \u2192 challenge',
 ];
-
-export function makeChallenge() {
-  const digits = [2, 3, 4, 5, 6, 7, 8, 9];
-  const correct = digits[Math.floor(Math.random() * digits.length)];
-  let distractor;
-  do {
-    distractor = digits[Math.floor(Math.random() * digits.length)];
-  } while (distractor === correct);
-
-  const swapOrder = Math.random() < 0.5;
-  const buttons = swapOrder ? [distractor, correct] : [correct, distractor];
-
-  const phrase = CHALLENGE_PHRASES[Math.floor(Math.random() * CHALLENGE_PHRASES.length)](correct);
-
-  return {
-    correct,
-    buttons,
-    phrase,
-  };
-}
 
 // ============================================================================
 // Finalьnaya sborka pusha
+// ============================================================================
+//
+// ACK vozmozhen TOL'KO cherez in-app challenge. V pushe prosto tekst +
+// podskazka "otkroy app". Nazvanie "challenge" v payload bolshe ne
+// nuzhno \u2014 challenge generiruetsya klientom v PWA.
 // ============================================================================
 
 export async function buildPushBody(env, reminder, attempt) {
@@ -206,18 +191,13 @@ export async function buildPushBody(env, reminder, attempt) {
   }
   if (!baseText) baseText = pickFallbackText(reminder, attempt);
 
-  // Challenge vklyuchayem nachinaya so vtorogo pusha — pervoye napominaniye
-  // dayom prosto s Gotovo/Otlozhit'. Yesli proignorival \u2014 dal'she uzhe challenge.
-  const useChallenge = attempt >= 2 && env.ENABLE_CHALLENGE !== 'false';
-
-  if (!useChallenge) {
-    return { text: baseText, challenge: null };
+  // Na 2-oy popytke i dal'she dobavlyaem yavnuyu podskazku "otkroy app"
+  if (attempt >= 2) {
+    const hint = OPEN_HINTS[Math.floor(Math.random() * OPEN_HINTS.length)];
+    baseText = `${baseText} \u2192 ${hint}`;
   }
 
-  const challenge = makeChallenge();
-  const text = `${baseText} \u2192 ${challenge.phrase}`;
-  return {
-    text: text.length > 140 ? text.slice(0, 137) + '...' : text,
-    challenge,
-  };
+  if (baseText.length > 140) baseText = baseText.slice(0, 137) + '...';
+
+  return { text: baseText, challenge: null };
 }

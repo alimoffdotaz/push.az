@@ -116,14 +116,12 @@ self.addEventListener('push', (event) => {
     silent: false,
   };
 
-  if (challenge && Array.isArray(challenge.buttons) && challenge.buttons.length === 2) {
+  // Dizayn-reshenie: ACK vozmozhen TOL'KO cherez in-app challenge.
+  // V pushe mozhno tol'ko otlozhit' ili otkryt' app. Gotovo v notif net \u2014
+  // chtoby nel'zya bylo "avtoматom" ubit' napominaniye.
+  if (isReminder || data.type === 'test') {
     options.actions = [
-      { action: 'btn-' + challenge.buttons[0], title: String(challenge.buttons[0]) },
-      { action: 'btn-' + challenge.buttons[1], title: String(challenge.buttons[1]) },
-    ];
-  } else if (isReminder) {
-    options.actions = [
-      { action: 'done', title: '\u2713 Gotovo' },
+      { action: 'open', title: 'Otkryt\u2019 i podtverdit\u2019' },
       { action: 'snooze', title: 'Otlozhit\u2019 10m' },
     ];
   }
@@ -158,62 +156,21 @@ self.addEventListener('notificationclick', (event) => {
     (async () => {
       const isRealReminder = reminderId && reminderId !== 'test' && !data.local;
 
-      // === CHALLENGE MODE ===
-      if (challenge && typeof action === 'string' && action.startsWith('btn-')) {
-        const pressed = Number(action.slice(4));
-        if (pressed === Number(challenge.correct)) {
-          // Pravil'no \u2192 akaem
-          notification.close();
-          if (isRealReminder) {
-            await callAck(reminderId, 'done', 10);
-          }
-          await notifyClients({
-            type: 'reminder-acked',
-            reminderId,
-            action: 'done',
-          });
-          await updateBadgeAfterAck(data);
-          await focusClient();
-          return;
-        } else {
-          // Nepravil'naya knopka \u2192 ne akaem, pokazyvaem novyy notif s novym challenge
-          notification.close();
-          await showWrongAnswer(data);
-          return;
-        }
-      }
+      notification.close();
 
-      // === CHALLENGE NO PRESSED BUTTON (tap po tyelu) ===
-      // Yesli u pusha byl challenge, a polьzovatel' prosto tapnul po kartochke \u2014
-      // NE akaem. Prosto otkryvaem prilozheniye.
-      if (challenge && !action) {
-        notification.close();
-        await focusClient();
+      // === SNOOZE \u2014 edinstvennoye chto mozhno sdelat' iz samogo pusha ===
+      if (action === 'snooze') {
+        if (isRealReminder) await callAck(reminderId, 'snooze', 10);
+        await notifyClients({ type: 'reminder-snoozed', reminderId });
         return;
       }
 
-      // === BEZ CHALLENGE: standartnaya logika ===
-      notification.close();
-
-      if (isRealReminder && (action === 'done' || action === 'snooze' || action === '')) {
-        const effectiveAction = action === 'snooze' ? 'snooze' : 'done';
-        if (action !== '' || data.type === 'reminder') {
-          await callAck(reminderId, effectiveAction, 10);
-        }
-      }
-
+      // === Vsyo ostal'noye (tap po tyelu, action='open') \u2014 otkryvaem app.
+      // Ack proizoydyot tol'ko kogda polzovatel' projdyot in-app challenge.
       await notifyClients({
-        type: 'reminder-acked',
+        type: 'open-challenge',
         reminderId,
-        action: action || (data.type === 'reminder' ? 'done' : 'open'),
       });
-
-      if (action !== 'snooze') {
-        await updateBadgeAfterAck(data);
-      }
-
-      if (action === 'snooze') return;
-
       await focusClient();
     })(),
   );
@@ -223,57 +180,6 @@ self.addEventListener('notificationclose', (event) => {
   const data = event.notification.data || {};
   console.log('[sw] notification closed without interaction', data?.reminderId);
 });
-
-// ============================================================================
-// Wrong-answer re-show \u2014 lokal'no generiruyem novyy challenge
-// ============================================================================
-
-async function showWrongAnswer(prevData) {
-  const reminderId = prevData.reminderId || '';
-  const failures = Number(prevData.challengeFailures || 0) + 1;
-  const newChallenge = makeLocalChallenge();
-  const prefix = failures >= 2 ? '\u203c Vnimatel\u2019no. ' : 'Nepravil\u2019no. ';
-  const body = prefix + newChallenge.phrase;
-
-  await self.registration.showNotification(prevData.title || 'push.az', {
-    body,
-    icon: '/icons/icon-alert.svg',
-    badge: '/icons/icon.svg',
-    tag: 'push-az-' + (reminderId || 'generic'),
-    renotify: true,
-    requireInteraction: true,
-    silent: false,
-    vibrate: [300, 100, 300],
-    data: {
-      ...prevData,
-      challenge: newChallenge,
-      challengeFailures: failures,
-    },
-    actions: [
-      { action: 'btn-' + newChallenge.buttons[0], title: String(newChallenge.buttons[0]) },
-      { action: 'btn-' + newChallenge.buttons[1], title: String(newChallenge.buttons[1]) },
-    ],
-  });
-}
-
-function makeLocalChallenge() {
-  const digits = [2, 3, 4, 5, 6, 7, 8, 9];
-  const correct = digits[Math.floor(Math.random() * digits.length)];
-  let distractor;
-  do {
-    distractor = digits[Math.floor(Math.random() * digits.length)];
-  } while (distractor === correct);
-  const swap = Math.random() < 0.5;
-  const buttons = swap ? [distractor, correct] : [correct, distractor];
-  const phrases = [
-    (n) => `Hold push, nazhmi [${n}]`,
-    (n) => `Long-press \u2192 [${n}]`,
-    (n) => `Derzhi i tap [${n}]`,
-    (n) => `Na etot raz \u2014 [${n}]`,
-  ];
-  const phrase = phrases[Math.floor(Math.random() * phrases.length)](correct);
-  return { correct, buttons, phrase };
-}
 
 // ============================================================================
 // Badge API (schyotchik na ikonke PWA)

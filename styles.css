@@ -801,6 +801,80 @@ a:hover {
   margin-top: 20px;
 }
 
+.takeover-challenge {
+  margin-top: 24px;
+  padding: 20px 16px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.takeover-challenge-prompt {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 14px;
+  line-height: 1.35;
+}
+
+.takeover-challenge-prompt strong {
+  color: #fbcfe8;
+  font-size: 22px;
+  font-weight: 800;
+  padding: 0 6px;
+  text-shadow: 0 0 18px rgba(236, 72, 153, 0.6);
+}
+
+.takeover-challenge-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.takeover-challenge-btn {
+  padding: 22px 0;
+  border-radius: 16px;
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 80ms ease, background 200ms ease, border-color 200ms ease;
+}
+
+.takeover-challenge-btn:active {
+  transform: scale(0.94);
+  background: var(--surface-3, rgba(255,255,255,0.06));
+}
+
+.takeover-challenge-btn.wrong {
+  animation: shake 300ms ease;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.takeover-challenge-btn.correct {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.25);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.takeover-challenge-hint {
+  text-align: center;
+  font-size: 13px;
+  color: #fbbf24;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
 .takeover-btn {
   padding: 14px 20px;
   border-radius: 14px;
