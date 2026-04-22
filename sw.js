@@ -266,10 +266,10 @@ function makeLocalChallenge() {
   const swap = Math.random() < 0.5;
   const buttons = swap ? [distractor, correct] : [correct, distractor];
   const phrases = [
-    (n) => `Nazhmi ${n}`,
-    (n) => `Podtverdi: ${n}`,
-    (n) => `Tap na ${n}`,
-    (n) => `Tsifra ${n}`,
+    (n) => `Hold push, nazhmi [${n}]`,
+    (n) => `Long-press \u2192 [${n}]`,
+    (n) => `Derzhi i tap [${n}]`,
+    (n) => `Na etot raz \u2014 [${n}]`,
   ];
   const phrase = phrases[Math.floor(Math.random() * phrases.length)](correct);
   return { correct, buttons, phrase };

@@ -69,12 +69,27 @@ function sanitizeText(s) {
   s = s.replace(/^["'«`]+|["'»`]+$/g, '');
   s = s.replace(/^(push|soobshcheniye|napominaniye|text|otvet)[:\-–]\s*/i, '');
   // Ubirayem "burst-caps" tipa "О Т Ч Е Т" (otdel'nyye bukvy s probelami).
-  // Yesli bolee 4 podryad odnosymvol'nykh "slov" — sklеyivaem.
   s = s.replace(/\b([\p{L}\p{N}])(?:\s+([\p{L}\p{N}])){3,}\b/gu, (m) =>
     m.replace(/\s+/g, ''),
   );
   if (s.length > 140) s = s.slice(0, 137) + '...';
   return s;
+}
+
+function hasCyrillic(s) {
+  return /[\u0400-\u04FF]/.test(s || '');
+}
+
+function looksOK(s) {
+  if (!s || s.length < 3) return false;
+  if (hasCyrillic(s)) return false;
+  // Otkazyvayem yesli bol'she 40% simvolov v UPPERCASE (krichащий AI)
+  const letters = s.match(/[a-z]/gi) || [];
+  const upper = s.match(/[A-Z]/g) || [];
+  if (letters.length > 10 && upper.length / letters.length > 0.5) return false;
+  // Otkazyvayem yesli mnozhestvo vosklicatel'nyh/voprositelьnyh podryad
+  if (/[!?]{3,}/.test(s)) return false;
+  return true;
 }
 
 // ============================================================================
@@ -99,35 +114,42 @@ export async function generateAIText(ai, reminder, attempt) {
     {
       role: 'system',
       content:
-        'Ty pishesh\u2019 teksty push-uvedomleniy. Zhestkiye pravila:\n' +
-        '1. OTVET \u2014 TOL\u2019KO SAM TEKST PUSHA, nichego bol\u2019she.\n' +
-        '2. Odna stroka. BEZ perenosov stroki, BEZ \\n.\n' +
-        '3. BEZ probеlov mezhdu bukvami (ne "O T C H E T", a "otchet").\n' +
-        '4. Maksimum 90 simvolov vklyuchaya probel.\n' +
-        '5. BEZ kavychek, bez "Push:", bez emoji v stile smaylov lits.\n' +
-        '6. Yazyk: russkiy transliteratsiya (latinitsey), chtoby sovpadal' +
-        ' so stilem vkhoda.\n' +
-        '7. Stil: ' + (TONE_INSTRUCTIONS[escalatedTone] || TONE_INSTRUCTIONS.friendly) + '.\n' +
-        '8. Kazhdyy raz formuliruy po-drugomu. NE povtoryai shablon "Napominayu: X".',
+        'You write short push notification texts in transliterated Russian ' +
+        '(Latin alphabet only, NO Cyrillic letters). STRICT RULES:\n' +
+        '1. OUTPUT ONLY THE NOTIFICATION TEXT. No explanations, no quotes, no prefixes.\n' +
+        '2. One single line. NO line breaks. NO \\n.\n' +
+        '3. NO spaces between letters inside a word. Write "otchet", NOT "O T C H E T".\n' +
+        '4. Max 80 characters including spaces.\n' +
+        '5. LATIN letters only. NEVER use Cyrillic (а, б, в, г, д, etc). ' +
+        'Use transliteration: "Pora nachat\u2019 otchet", NOT "Пора начать отчет".\n' +
+        '6. No emoji, no all-caps shouting, no triple exclamation marks.\n' +
+        '7. Style: ' + (TONE_INSTRUCTIONS[escalatedTone] || TONE_INSTRUCTIONS.friendly) + '.\n' +
+        '8. Be varied. Do NOT always start with "Napominayu:".\n' +
+        'EXAMPLES of good output:\n' +
+        '  "Tvoya zadacha otchet zhdyot tebya."\n' +
+        '  "Ey, pora nachat\u2019 otchet."\n' +
+        '  "Otchet \u2014 samoye vremya."',
     },
     {
       role: 'user',
       content:
-        `Zadacha pol'zovatelya: ${reminder.title}` +
-        (reminder.note ? `\nKontekst: ${reminder.note}` : '') +
-        `\nPopytka nomer: ${attempt}.` +
-        `\nNapishi odnu svezhuyu fraza-napominaniye, kotoraya tsepit vnimaniye.`,
+        `Task: ${reminder.title}` +
+        (reminder.note ? `. Context: ${reminder.note}` : '') +
+        `. Attempt: ${attempt}. Write one fresh reminder line in transliterated Russian.`,
     },
   ];
 
   try {
     const response = await ai.run(
       '@cf/meta/llama-3.2-3b-instruct',
-      { messages, max_tokens: 60, temperature: 0.7 },
+      { messages, max_tokens: 50, temperature: 0.6 },
     );
     const raw = response?.response || '';
     const clean = sanitizeText(raw);
-    if (!clean || clean.length < 3) return null;
+    if (!looksOK(clean)) {
+      console.warn('AI output rejected:', JSON.stringify(raw).slice(0, 200));
+      return null;
+    }
     return clean;
   } catch (err) {
     console.warn('AI generation failed:', err?.message || err);
@@ -146,12 +168,11 @@ export async function generateAIText(ai, reminder, attempt) {
 // ============================================================================
 
 const CHALLENGE_PHRASES = [
-  (n) => `Podtverdi: nazhmi ${n}`,
-  (n) => `Chtoby zakryt' \u2014 ${n}`,
-  (n) => `Vvedi podtverzhdеniye: ${n}`,
-  (n) => `Tap na ${n} chtoby zavershit'`,
-  (n) => `Dokazhi chto prochel. Nazhmi ${n}`,
-  (n) => `Podpisь: ${n}`,
+  (n) => `Hold push \u2192 nazhmi knopku [${n}]`,
+  (n) => `Long-press \u2192 [${n}]`,
+  (n) => `Chtoby zakryt': long-press i [${n}]`,
+  (n) => `Derzhi push, nazhmi [${n}]`,
+  (n) => `Long-press i tap [${n}] \u2014 i svoboden`,
 ];
 
 export function makeChallenge() {
