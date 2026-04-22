@@ -1,0 +1,44 @@
+name = "push-az-worker"
+main = "src/index.js"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+# ============================================================================
+# Cron Triggers — zapuskaem planirovshchik kazhduyu minutu
+# ============================================================================
+[triggers]
+crons = ["* * * * *"]
+
+# ============================================================================
+# D1 Database — khranim ustroystva, reminderu, otpravki
+# Posle sozdaniya bazy cherez dashboard ili `wrangler d1 create push-az-db`
+# vstav' syuda yeyo database_id
+# ============================================================================
+[[d1_databases]]
+binding = "DB"
+database_name = "push-az-db"
+database_id = "REPLACE_WITH_D1_ID_FROM_DASHBOARD"
+
+# ============================================================================
+# Workers AI — dlya generatsii unikal'nykh tekstov uvedomleniy
+# ============================================================================
+[ai]
+binding = "AI"
+
+# ============================================================================
+# Peremennyye (bezopasnyye, mozhno v git)
+# ============================================================================
+[vars]
+ALLOWED_ORIGIN = "https://push-az.pages.dev"
+AI_MODEL = "@cf/meta/llama-3.2-3b-instruct"
+ENABLE_AI_GENERATION = "true"
+
+# ============================================================================
+# Secrets (ustanavlivay cherez dashboard ili:
+#   wrangler secret put VAPID_PRIVATE_KEY
+#   wrangler secret put VAPID_PUBLIC_KEY
+#   wrangler secret put VAPID_SUBJECT
+# ============================================================================

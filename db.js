@@ -1,6 +1,7 @@
 const DB_NAME = 'push-az';
-const DB_VERSION = 1;
-const STORE = 'reminders';
+const DB_VERSION = 2;
+const STORE_REMINDERS = 'reminders';
+const STORE_CONFIG = 'config';
 
 let dbPromise = null;
 
@@ -8,11 +9,14 @@ function openDB() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_REMINDERS)) {
+        const store = db.createObjectStore(STORE_REMINDERS, { keyPath: 'id' });
         store.createIndex('fireAt', 'fireAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_CONFIG)) {
+        db.createObjectStore(STORE_CONFIG, { keyPath: 'key' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -21,8 +25,8 @@ function openDB() {
   return dbPromise;
 }
 
-function tx(mode) {
-  return openDB().then((db) => db.transaction(STORE, mode).objectStore(STORE));
+function tx(store, mode) {
+  return openDB().then((db) => db.transaction(store, mode).objectStore(store));
 }
 
 function req(request) {
@@ -34,23 +38,40 @@ function req(request) {
 
 export const db = {
   async getAll() {
-    const store = await tx('readonly');
+    const store = await tx(STORE_REMINDERS, 'readonly');
     return req(store.getAll());
   },
   async get(id) {
-    const store = await tx('readonly');
+    const store = await tx(STORE_REMINDERS, 'readonly');
     return req(store.get(id));
   },
   async put(reminder) {
-    const store = await tx('readwrite');
+    const store = await tx(STORE_REMINDERS, 'readwrite');
     return req(store.put(reminder));
   },
   async delete(id) {
-    const store = await tx('readwrite');
+    const store = await tx(STORE_REMINDERS, 'readwrite');
     return req(store.delete(id));
   },
   async clear() {
-    const store = await tx('readwrite');
+    const store = await tx(STORE_REMINDERS, 'readwrite');
     return req(store.clear());
+  },
+};
+
+export const config = {
+  async get(key, fallback = null) {
+    const store = await tx(STORE_CONFIG, 'readonly');
+    const row = await req(store.get(key));
+    return row ? row.value : fallback;
+  },
+  async set(key, value) {
+    const store = await tx(STORE_CONFIG, 'readwrite');
+    return req(store.put({ key, value }));
+  },
+  async getAll() {
+    const store = await tx(STORE_CONFIG, 'readonly');
+    const rows = await req(store.getAll());
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]));
   },
 };

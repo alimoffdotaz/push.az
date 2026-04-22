@@ -6,3 +6,14 @@ node_modules/
 dist/
 .env
 .env.local
+
+# Cloudflare Workers
+worker/.wrangler/
+worker/.dev.vars
+worker/node_modules/
+
+# Local secrets \u2014 nikogda ne commit'
+*vapid*private*
+vapid-keys.json
+secrets.json
+

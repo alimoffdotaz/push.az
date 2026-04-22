@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VAPID Key Generator — push.az</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: rgba(255, 255, 255, 0.05);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #e5e7eb;
+      --text-dim: #9ca3af;
+      --accent: #6366f1;
+      --accent-2: #ec4899;
+      --success: #22c55e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(1000px 600px at 10% 0%, rgba(99, 102, 241, 0.25), transparent),
+        radial-gradient(800px 500px at 110% 20%, rgba(236, 72, 153, 0.2), transparent),
+        var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+      padding: 40px 20px;
+      line-height: 1.5;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 8px;
+    }
+    .tagline { color: var(--text-dim); margin-bottom: 32px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      margin-bottom: 16px;
+    }
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      border: none;
+      padding: 12px 22px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 150ms, filter 150ms;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:active { transform: translateY(1px); }
+    button.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .field label {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .field-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .field-row input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      word-break: break-all;
+    }
+    .copy-btn {
+      padding: 0 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .copy-btn.done { background: rgba(34, 197, 94, 0.2); border-color: var(--success); color: var(--success); }
+    .output { display: none; }
+    .output.shown { display: block; }
+    .note {
+      font-size: 13px;
+      color: var(--text-dim);
+      padding: 12px 14px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 10px;
+      margin-top: 16px;
+    }
+    .note strong { color: #f59e0b; }
+    code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; }
+    pre { background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 12px; margin-top: 8px; }
+    ol { margin-left: 20px; margin-top: 8px; }
+    ol li { margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>VAPID Key Generator</h1>
+    <p class="tagline">Generiruyet P-256 keypair dlya Web Push. Vsyo proiskhodit lokal'no v brauzere cherez Web Crypto API — klyuchi NE otpravlyayutsya nikuda.</p>
+
+    <div class="card">
+      <button id="generate">Sgenerirovat' novyye VAPID klyuchi</button>
+
+      <div id="output" class="output">
+        <div class="field" style="margin-top: 24px;">
+          <label>VAPID Public Key (dlya PWA — frontend)</label>
+          <div class="field-row">
+            <input id="pub" readonly />
+            <button class="copy-btn" data-copy="pub">Copy</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>VAPID Private Key (tol'ko dlya Cloudflare Worker secret)</label>
+          <div class="field-row">
+            <input id="priv" readonly />
+            <button class="copy-btn" data-copy="priv">Copy</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>VAPID Subject (email dlya push-servisa — Apple/Google mogut napisat' sudar yesli problema)</label>
+          <div class="field-row">
+            <input id="subj" value="mailto:ayxan.a@gmail.com" />
+            <button class="copy-btn" data-copy="subj">Copy</button>
+          </div>
+        </div>
+
+        <div class="note">
+          <strong>Vazhno:</strong> sokhrani <code>Private Key</code> v nadyozhnom meste. On dayot pravo otpravlyat' push vsem podpisannym ustroystvam. Yesli uteryayesh' — pridyotsya peregenerirovat' (vse podpiski pereobnovyatsya).
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size: 16px; margin-bottom: 12px;">Chto delat' dal'she</h2>
+      <ol style="color: var(--text-dim); font-size: 14px;">
+        <li><strong style="color: var(--text);">Public key</strong> poydyot v kod PWA (fayl <code>app.js</code>, peremennaya <code>VAPID_PUBLIC_KEY</code>)</li>
+        <li><strong style="color: var(--text);">Private key</strong> poydyot v Cloudflare Worker kak <strong>secret</strong> (cherez dashboard ili <code>wrangler secret put VAPID_PRIVATE_KEY</code>). <strong>Nikogda ne commit' v git.</strong></li>
+        <li><strong style="color: var(--text);">Subject</strong> \u2014 tvoy email v formate <code>mailto:...</code>. Tozhe v Worker settings kak <code>VAPID_SUBJECT</code>.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    function b64urlFromBuffer(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function generateVapidKeys() {
+      const keyPair = await crypto.subtle.generateKey(
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        true,
+        ['sign', 'verify'],
+      );
+
+      const pubRaw = await crypto.subtle.exportKey('raw', keyPair.publicKey);
+      const privJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
+
+      if (!privJwk.d) throw new Error('Private key export failed');
+
+      const privRaw = Uint8Array.from(atob(privJwk.d.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+
+      return {
+        publicKey: b64urlFromBuffer(pubRaw),
+        privateKey: b64urlFromBuffer(privRaw.buffer),
+      };
+    }
+
+    document.getElementById('generate').addEventListener('click', async (e) => {
+      e.target.disabled = true;
+      e.target.textContent = 'Generiruyu...';
+      try {
+        const { publicKey, privateKey } = await generateVapidKeys();
+        document.getElementById('pub').value = publicKey;
+        document.getElementById('priv').value = privateKey;
+        document.getElementById('output').classList.add('shown');
+        e.target.textContent = 'Sgenerirovat\u2019 snova';
+      } catch (err) {
+        alert('Oshibka: ' + err.message);
+        e.target.textContent = 'Sgenerirovat\u2019 novyye VAPID klyuchi';
+      } finally {
+        e.target.disabled = false;
+      }
+    });
+
+    document.querySelectorAll('.copy-btn[data-copy]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.copy;
+        const input = document.getElementById(id);
+        try {
+          await navigator.clipboard.writeText(input.value);
+          const orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          btn.classList.add('done');
+          setTimeout(() => {
+            btn.textContent = orig;
+            btn.classList.remove('done');
+          }, 1500);
+        } catch {
+          input.select();
+          document.execCommand('copy');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
