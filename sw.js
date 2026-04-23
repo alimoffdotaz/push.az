@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v8';
+const CACHE = 'push-az-v9';
 const ASSETS = [
   '/',
   '/index.html',

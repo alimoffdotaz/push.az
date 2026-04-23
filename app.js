@@ -42,7 +42,6 @@ const noteEl = $('#note');
 const whenEl = $('#when');
 const repeatEl = $('#repeat');
 const toneEl = $('#tone');
-const resetBtn = $('#reset-btn');
 const listEl = $('#reminders-list');
 const pastListEl = $('#past-list');
 const pastSection = $('#past-section');
@@ -84,6 +83,21 @@ function toneLabel(tone) { return t('tone.' + (tone || 'friendly')); }
 // ============================================================================
 // Utilities
 // ============================================================================
+
+// Режим отладки: ?debug=1 в URL или localStorage.setItem('push_az_debug','1')
+function isAppDebug() {
+  try {
+    const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+    if (q && (q.get('debug') === '1' || q.get('debug') === 'true')) return true;
+    return localStorage.getItem('push_az_debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function debugLog(...args) {
+  if (isAppDebug()) console.log('[push.az]', ...args);
+}
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1093,8 +1107,10 @@ function renderItem(r, isPast = false) {
 
 async function addReminder(e) {
   e.preventDefault();
+  debugLog('addReminder start', { when: whenEl?.value, titleLen: (titleEl?.value || '').length });
   setMinDateTime();
   if (form && typeof form.reportValidity === 'function' && !form.reportValidity()) {
+    debugLog('addReminder aborted: reportValidity');
     return;
   }
   const title = (titleEl?.value || '').trim();
@@ -1142,6 +1158,7 @@ async function addReminder(e) {
     if (toneEl) toneEl.value = tone;
     setMinDateTime();
     closeComposer();
+    debugLog('addReminder ok', { id: reminder.id });
     toast(t('toast.created'), 'success');
   } catch (err) {
     console.error('addReminder', err);
@@ -1153,16 +1170,39 @@ const composerDialog = document.getElementById('composer-dialog');
 
 function openComposer() {
   if (!composerDialog) return;
+  composerDialog.removeAttribute('hidden');
   setMinDateTime();
-  if (composerDialog.showModal) composerDialog.showModal();
-  else composerDialog.hidden = false;
+  if (typeof composerDialog.showModal === 'function') {
+    try {
+      composerDialog.showModal();
+    } catch (err) {
+      console.warn('[push.az] showModal failed', err);
+      composerDialog.hidden = false;
+    }
+  } else {
+    composerDialog.hidden = false;
+  }
+  debugLog('composer open', { dialogOpen: composerDialog.open, when: whenEl?.value });
   setTimeout(() => titleEl?.focus(), 50);
 }
 
 function closeComposer() {
   if (!composerDialog) return;
-  if (composerDialog.close && composerDialog.open) composerDialog.close();
-  else composerDialog.hidden = true;
+  const nativeDialog =
+    typeof composerDialog.showModal === 'function' && typeof composerDialog.close === 'function';
+  if (nativeDialog) {
+    try {
+      if (composerDialog.open) composerDialog.close();
+    } catch (err) {
+      debugLog('composer close() error', err);
+    }
+    // Важно: не ставить hidden на <dialog> при повторном вызове close (open уже false),
+    // иначе второй showModal() перестаёт показывать модалку (Safari/WebKit).
+    composerDialog.removeAttribute('hidden');
+    debugLog('composer close', { dialogOpen: composerDialog.open });
+    return;
+  }
+  composerDialog.hidden = true;
 }
 
 async function deleteReminder(id) {
@@ -1744,7 +1784,6 @@ async function registerSW() {
 
 function bindEvents() {
   if (form) form.addEventListener('submit', addReminder);
-  if (resetBtn) resetBtn.addEventListener('click', () => { form.reset(); setMinDateTime(); closeComposer(); });
   permissionBtn.addEventListener('click', requestPermission);
   testLink.addEventListener('click', sendTestNotification);
   if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
@@ -1762,7 +1801,12 @@ function bindEvents() {
   const openComposerBtn = document.getElementById('open-composer-btn');
   if (openComposerBtn) openComposerBtn.addEventListener('click', openComposer);
   document.querySelectorAll('[data-close-composer]').forEach((b) =>
-    b.addEventListener('click', closeComposer),
+    b.addEventListener('click', () => {
+      if (form) form.reset();
+      setMinDateTime();
+      closeComposer();
+      debugLog('composer dismiss (cancel/X)');
+    }),
   );
 
   if (takeoverSnooze) takeoverSnooze.addEventListener('click', takeoverSnoozeAction);
