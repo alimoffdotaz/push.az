@@ -1,23 +1,29 @@
 :root {
-  --bg: #0b1020;
-  --bg-grad-1: #0f172a;
-  --bg-grad-2: #1e1b4b;
+  --bg: #080b0f;
+  --bg-grad-1: #0e1318;
+  --bg-grad-2: #0a1520;
   --surface: rgba(255, 255, 255, 0.04);
-  --surface-2: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text: #e5e7eb;
-  --text-dim: #9ca3af;
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --text: #e8eaed;
+  --text-dim: #9aa3ad;
   --text-muted: #6b7280;
-  --accent: #6366f1;
-  --accent-2: #ec4899;
-  --accent-soft: rgba(99, 102, 241, 0.15);
-  --danger: #ef4444;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --radius: 14px;
-  --radius-sm: 10px;
-  --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  /* Один спокойный акцент (бирюза), второй — лёгкий холодный блик */
+  --accent: #2dd4bf;
+  --accent-2: #38bdf8;
+  --accent-soft: rgba(45, 212, 191, 0.14);
+  --accent-ink: rgba(15, 23, 42, 0.92);
+  --accent-on-surface: #5eead4;
+  --tone-violet-bg: rgba(139, 92, 246, 0.12);
+  --tone-violet-border: rgba(139, 92, 246, 0.32);
+  --tone-violet-text: #ddd6fe;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.55);
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -33,15 +39,16 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
-  background: radial-gradient(1200px 800px at 10% -10%, rgba(99, 102, 241, 0.25), transparent 60%),
-    radial-gradient(1000px 700px at 110% 10%, rgba(236, 72, 153, 0.2), transparent 60%),
-    linear-gradient(180deg, var(--bg-grad-1), var(--bg));
+  background:
+    radial-gradient(900px 520px at 12% -8%, rgba(45, 212, 191, 0.09), transparent 58%),
+    radial-gradient(720px 480px at 96% 4%, rgba(56, 189, 248, 0.06), transparent 55%),
+    linear-gradient(168deg, var(--bg-grad-1) 0%, var(--bg) 45%, var(--bg-grad-2) 100%);
   min-height: 100vh;
   min-height: 100dvh;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -56,7 +63,7 @@ select {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-2);
   text-decoration: none;
 }
 a:hover {
@@ -64,12 +71,12 @@ a:hover {
 }
 
 .app {
-  max-width: 720px;
+  max-width: 680px;
   margin: 0 auto;
-  padding: 24px 20px 80px;
+  padding: 28px 20px 88px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
 }
 
 .app-header {
@@ -111,12 +118,12 @@ body.has-overdue .brand-text h1 {
 .brand-logo {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-radius: 14px;
+  background: linear-gradient(145deg, #0d9488 0%, var(--accent) 45%, var(--accent-2) 100%);
   display: grid;
   place-items: center;
-  color: #fff;
-  box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.6);
+  color: var(--accent-ink);
+  box-shadow: 0 10px 28px -8px rgba(13, 148, 136, 0.45);
 }
 
 .brand-logo svg {
@@ -125,34 +132,36 @@ body.has-overdue .brand-text h1 {
 }
 
 .brand-text h1 {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .tagline {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
-  margin-top: -2px;
+  margin-top: 1px;
+  line-height: 1.4;
+  max-width: 42ch;
 }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  padding: 22px 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 14px;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  margin-bottom: 12px;
 }
 
 .form {
@@ -203,7 +212,7 @@ body.has-overdue .brand-text h1 {
 .field input:focus,
 .field textarea:focus,
 .field select:focus {
-  border-color: var(--accent);
+  border-color: rgba(45, 212, 191, 0.45);
   box-shadow: 0 0 0 3px var(--accent-soft);
   background: rgba(255, 255, 255, 0.06);
 }
@@ -271,14 +280,15 @@ body.has-overdue .brand-text h1 {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 10px 24px -10px rgba(99, 102, 241, 0.7);
+  background: linear-gradient(165deg, #0f766e 0%, #14b8a6 40%, #2dd4bf 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--accent-ink);
+  box-shadow: 0 12px 28px -10px rgba(13, 148, 136, 0.5);
 }
 
 .btn-primary:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
+  box-shadow: 0 14px 32px -10px rgba(13, 148, 136, 0.55);
 }
 
 .btn-ghost {
@@ -327,8 +337,8 @@ body.has-overdue .brand-text h1 {
 
 .badge {
   background: var(--accent-soft);
-  color: #c7d2fe;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: var(--accent-on-surface);
+  border: 1px solid rgba(45, 212, 191, 0.28);
   padding: 2px 10px;
   border-radius: 999px;
   font-size: 12px;
@@ -353,8 +363,14 @@ body.has-overdue .brand-text h1 {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 16px 18px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition), border-color var(--transition);
   animation: slide-in 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reminder-item:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 @keyframes slide-in {
@@ -381,18 +397,19 @@ body.has-overdue .brand-text h1 {
 }
 
 .reminder-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.02em;
   word-break: break-word;
 }
 
 .tag {
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: var(--accent-soft);
-  color: #c7d2fe;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: var(--accent-on-surface);
+  border: 1px solid rgba(45, 212, 191, 0.28);
   text-transform: lowercase;
   letter-spacing: 0.02em;
 }
@@ -482,12 +499,13 @@ body.has-overdue .brand-text h1 {
 .empty-icon {
   width: 56px;
   height: 56px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
+  margin: 0 auto 14px;
+  border-radius: 18px;
   background: var(--surface-2);
+  border: 1px solid var(--border);
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--accent-on-surface);
 }
 
 .empty-icon svg {
@@ -626,9 +644,9 @@ body.has-overdue .brand-text h1 {
 }
 
 .tag-tone {
-  background: rgba(236, 72, 153, 0.12);
-  border-color: rgba(236, 72, 153, 0.3);
-  color: #fbcfe8;
+  background: var(--tone-violet-bg);
+  border-color: var(--tone-violet-border);
+  color: var(--tone-violet-text);
 }
 
 /* ============================================================================
@@ -637,13 +655,13 @@ body.has-overdue .brand-text h1 {
 .settings-dialog,
 .composer-dialog {
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, #151a2e, #0f1426);
+  border-radius: calc(var(--radius) + 2px);
+  background: linear-gradient(180deg, rgba(20, 28, 36, 0.98), rgba(10, 14, 20, 0.99));
   color: var(--text);
   padding: 0;
   max-width: 440px;
   width: calc(100% - 32px);
-  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 28px 64px -16px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(45, 212, 191, 0.06);
 }
 
 .settings-dialog::backdrop,
@@ -728,10 +746,11 @@ body.has-overdue .brand-text h1 {
 .settings-status.error { color: #fca5a5; }
 
 .install-banner {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(236, 72, 153, 0.12));
-  border: 1px solid rgba(139, 92, 246, 0.35);
-  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.1), rgba(56, 189, 248, 0.06));
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  padding: 16px 18px;
   margin-bottom: 12px;
+  border-radius: var(--radius);
 }
 
 .install-banner-body {
@@ -745,11 +764,12 @@ body.has-overdue .brand-text h1 {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(45, 212, 191, 0.1);
+  border: 1px solid rgba(45, 212, 191, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e0e7ff;
+  color: var(--accent-on-surface);
 }
 
 .install-banner-icon svg {
@@ -811,11 +831,11 @@ body.has-overdue .brand-text h1 {
 
 .install-instructions kbd {
   font-family: ui-monospace, SFMono-Regular, monospace;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 11px;
-  color: #fbcfe8;
+  color: var(--accent-on-surface);
 }
 
 @media (max-width: 520px) {
@@ -876,17 +896,17 @@ body.has-overdue .brand-text h1 {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(900px 600px at 50% 30%, rgba(236, 72, 153, 0.35), transparent 60%),
-    radial-gradient(900px 600px at 50% 80%, rgba(99, 102, 241, 0.35), transparent 60%),
-    rgba(8, 10, 24, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  animation: takeover-bg 8s ease-in-out infinite alternate;
+    radial-gradient(900px 600px at 50% 28%, rgba(45, 212, 191, 0.14), transparent 62%),
+    radial-gradient(900px 600px at 50% 78%, rgba(56, 189, 248, 0.1), transparent 60%),
+    rgba(6, 8, 12, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: takeover-bg 10s ease-in-out infinite alternate;
 }
 
 @keyframes takeover-bg {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(30deg); }
+  0% { filter: hue-rotate(-6deg); }
+  100% { filter: hue-rotate(8deg); }
 }
 
 .takeover-content {
@@ -896,9 +916,9 @@ body.has-overdue .brand-text h1 {
   text-align: center;
   padding: 40px 24px;
   border-radius: 24px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.7);
+  background: rgba(14, 18, 24, 0.82);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
   animation: takeover-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -911,11 +931,11 @@ body.has-overdue .brand-text h1 {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(145deg, #0f766e, var(--accent), var(--accent-2));
   margin: 0 auto 20px;
   display: grid;
   place-items: center;
-  box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.6);
+  box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.45);
   animation: pulse 1.6s ease-out infinite;
 }
 
@@ -930,16 +950,16 @@ body.has-overdue .brand-text h1 {
 }
 
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.6); transform: scale(1); }
-  70% { box-shadow: 0 0 0 26px rgba(236, 72, 153, 0); transform: scale(1.05); }
-  100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); transform: scale(1); }
+  0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.45); transform: scale(1); }
+  70% { box-shadow: 0 0 0 26px rgba(45, 212, 191, 0); transform: scale(1.04); }
+  100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); transform: scale(1); }
 }
 
 .takeover-label {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.2em;
-  color: var(--accent-2);
+  letter-spacing: 0.18em;
+  color: var(--accent-on-surface);
   margin-bottom: 8px;
 }
 
@@ -964,9 +984,9 @@ body.has-overdue .brand-text h1 {
   font-weight: 600;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(236, 72, 153, 0.15);
-  color: #fbcfe8;
-  border: 1px solid rgba(236, 72, 153, 0.3);
+  background: var(--accent-soft);
+  color: var(--accent-on-surface);
+  border: 1px solid rgba(45, 212, 191, 0.28);
   margin-bottom: 24px;
 }
 
@@ -995,11 +1015,11 @@ body.has-overdue .brand-text h1 {
 }
 
 .takeover-challenge-prompt strong {
-  color: #fbcfe8;
+  color: #f0fdfa;
   font-size: 22px;
   font-weight: 800;
   padding: 0 6px;
-  text-shadow: 0 0 18px rgba(236, 72, 153, 0.6);
+  text-shadow: 0 0 20px rgba(45, 212, 191, 0.35);
 }
 
 .takeover-challenge-buttons {
@@ -1066,10 +1086,10 @@ body.has-overdue .brand-text h1 {
 .takeover-btn:active { transform: scale(0.98); }
 
 .takeover-btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 14px 30px -10px rgba(236, 72, 153, 0.6);
+  background: linear-gradient(165deg, #0f766e 0%, #14b8a6 40%, #2dd4bf 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--accent-ink);
+  box-shadow: 0 14px 32px -10px rgba(13, 148, 136, 0.45);
   font-size: 16px;
   padding: 16px 20px;
 }
@@ -1114,9 +1134,9 @@ body.has-overdue .brand-text h1 {
   justify-content: center;
   padding: 20px;
   background:
-    radial-gradient(1200px 600px at 50% -10%, rgba(99,102,241,0.25), transparent 60%),
-    radial-gradient(900px 500px at 100% 100%, rgba(236,72,153,0.18), transparent 60%),
-    linear-gradient(180deg, var(--bg-grad-1), var(--bg-grad-2));
+    radial-gradient(900px 520px at 50% -8%, rgba(45, 212, 191, 0.1), transparent 58%),
+    radial-gradient(700px 420px at 100% 100%, rgba(56, 189, 248, 0.07), transparent 55%),
+    linear-gradient(168deg, var(--bg-grad-1) 0%, var(--bg) 50%, var(--bg-grad-2));
   overflow-y: auto;
 }
 
@@ -1126,11 +1146,11 @@ body.has-overdue .brand-text h1 {
   width: 100%;
   max-width: 460px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
   padding: 32px 28px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1148,11 +1168,12 @@ body.has-overdue .brand-text h1 {
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(145deg, #0d9488 0%, var(--accent) 45%, var(--accent-2) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--accent-ink);
+  box-shadow: 0 12px 28px -10px rgba(13, 148, 136, 0.4);
 }
 
 .auth-logo svg { width: 28px; height: 28px; }
