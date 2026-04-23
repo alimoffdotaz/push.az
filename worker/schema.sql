@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
   id            TEXT    PRIMARY KEY,            -- random ULID/UUID
   display_name  TEXT,                           -- chelovecheskoye imya, opcional'no
   created_at    INTEGER NOT NULL,
-  last_login_at INTEGER NOT NULL
+  last_login_at INTEGER NOT NULL,
+  lang          TEXT    NOT NULL DEFAULT 'ru'   -- predpochtitel'nyy yazyk: ru | az | en
 );
 
 -- WebAuthn credentials (passkeys)

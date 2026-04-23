@@ -125,7 +125,7 @@ export async function getUserFromRequest(env, request) {
   if (!m) return null;
   const token = m[1].trim();
   const row = await env.DB.prepare(
-    `SELECT s.*, u.display_name AS user_display_name
+    `SELECT s.*, u.display_name AS user_display_name, u.lang AS user_lang
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = ?1 AND s.expires_at > ?2`,
   )
@@ -135,6 +135,7 @@ export async function getUserFromRequest(env, request) {
   return {
     userId: row.user_id,
     displayName: row.user_display_name,
+    lang: row.user_lang || 'ru',
     sessionId: row.id,
     deviceId: row.device_id,
   };
@@ -182,6 +183,8 @@ export async function handleRegisterBegin(request, env) {
   let body;
   try { body = await request.json(); } catch { body = {}; }
   const displayName = (body.displayName || '').toString().slice(0, 80) || 'Me';
+  const rawLang = (body.lang || '').toString().toLowerCase();
+  const lang = ['ru', 'az', 'en'].includes(rawLang) ? rawLang : 'ru';
 
   const origin = request.headers.get('Origin') || '';
   const cfg = getAuthConfig(env, origin);
@@ -190,9 +193,9 @@ export async function handleRegisterBegin(request, env) {
   const userId = randomId(16);
   const now = Date.now();
   await env.DB.prepare(
-    `INSERT INTO users (id, display_name, created_at, last_login_at) VALUES (?1, ?2, ?3, ?3)`,
+    `INSERT INTO users (id, display_name, created_at, last_login_at, lang) VALUES (?1, ?2, ?3, ?3, ?4)`,
   )
-    .bind(userId, displayName, now)
+    .bind(userId, displayName, now, lang)
     .run();
 
   const options = await generateRegistrationOptions({
@@ -304,11 +307,15 @@ export async function handleRegisterFinish(request, env) {
       .run();
   }
 
+  const userRow = await env.DB.prepare(`SELECT display_name, lang FROM users WHERE id = ?1`)
+    .bind(row.user_id)
+    .first();
+
   return {
     ok: true,
     token: session.token,
     expiresAt: session.expiresAt,
-    user: { id: row.user_id, displayName: 'Me' },
+    user: { id: row.user_id, displayName: userRow?.display_name || 'Me', lang: userRow?.lang || 'ru' },
   };
 }
 
@@ -416,7 +423,7 @@ export async function handleLoginFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name FROM users WHERE id = ?1`)
+  const userRow = await env.DB.prepare(`SELECT display_name, lang FROM users WHERE id = ?1`)
     .bind(credRow.user_id)
     .first();
 
@@ -424,7 +431,7 @@ export async function handleLoginFinish(request, env) {
     ok: true,
     token: session.token,
     expiresAt: session.expiresAt,
-    user: { id: credRow.user_id, displayName: userRow?.display_name || 'Me' },
+    user: { id: credRow.user_id, displayName: userRow?.display_name || 'Me', lang: userRow?.lang || 'ru' },
   };
 }
 
@@ -443,9 +450,31 @@ export async function handleMe(request, env) {
     .all();
 
   return {
-    user: { id: user.userId, displayName: user.displayName },
+    user: { id: user.userId, displayName: user.displayName, lang: user.lang },
     credentials: creds.results || [],
   };
+}
+
+// ============================================================================
+// /api/user/lang — menyayem predpochtitel'nyy yazyk pol'zovatelya
+// ============================================================================
+
+export async function handleSetLang(request, env) {
+  const user = await getUserFromRequest(env, request);
+  if (!user) return { error: 'unauthorized', status: 401 };
+
+  let body;
+  try { body = await request.json(); } catch { body = {}; }
+  const rawLang = (body.lang || '').toString().toLowerCase();
+  if (!['ru', 'az', 'en'].includes(rawLang)) {
+    return { error: 'lang must be one of: ru, az, en', status: 400 };
+  }
+
+  await env.DB.prepare(`UPDATE users SET lang = ?1 WHERE id = ?2`)
+    .bind(rawLang, user.userId)
+    .run();
+
+  return { ok: true, lang: rawLang };
 }
 
 // ============================================================================

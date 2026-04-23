@@ -10,6 +10,7 @@ import {
   handleAddPasskeyBegin,
   handleAddPasskeyFinish,
   handleRemovePasskey,
+  handleSetLang,
   getUserFromRequest,
 } from './auth.js';
 import {
@@ -135,6 +136,9 @@ async function handleRequest(request, env, ctx) {
   if (rmPasskeyMatch && method === 'DELETE') {
     return authRoute((r, e) => handleRemovePasskey(r, e, rmPasskeyMatch[1]), request, env);
   }
+  if (path === '/api/user/lang' && method === 'POST') {
+    return authRoute(handleSetLang, request, env);
+  }
 
   // ---- Telegram webhook (publichniy, zashchishchyon po X-Telegram-Bot-Api-Secret-Token) ----
   if (path === '/api/telegram/webhook' && method === 'POST') {
@@ -228,6 +232,7 @@ async function handleRequest(request, env, ctx) {
         'POST   /api/auth/passkey/add/begin',
         'POST   /api/auth/passkey/add/finish',
         'DELETE /api/auth/passkey/:id',
+        'POST   /api/user/lang',
         'POST   /api/subscribe',
         'POST   /api/unsubscribe',
         'GET    /api/reminders',
@@ -491,8 +496,10 @@ async function handleTestPush(request, env, ctx, user) {
   const vapid = getVapidConfig(env);
   if (!vapid) return jsonResponse({ error: 'VAPID not configured' }, 500, request, env);
 
-  const testReminder = { id: 'test', title: 'Test push.az', note: '', tone: 'friendly' };
-  const built = await buildPushBody(env, testReminder, 2);
+  const testTitles = { ru: 'Тест push.az', az: 'push.az testi', en: 'push.az test' };
+  const lang = user.lang || 'ru';
+  const testReminder = { id: 'test', title: testTitles[lang] || testTitles.ru, note: '', tone: 'friendly' };
+  const built = await buildPushBody(env, testReminder, 2, lang);
   const pendingCount = await countPendingRemindersForUser(env, user.userId);
 
   // Telegram test send
@@ -510,6 +517,7 @@ async function handleTestPush(request, env, ctx, user) {
         body: built.text,
         reminderId: 'test',
         pendingCount,
+        lang,
       },
       vapid,
     );
@@ -661,7 +669,15 @@ async function processOneReminder(env, r, vapid, now) {
   }
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone };
-  const built = await buildPushBody(env, reminder, attempt);
+
+  // Yazyk pol'zovatelya (dlya AI, fallback'ov i Telegram formattera)
+  let lang = 'ru';
+  try {
+    const u = await env.DB.prepare(`SELECT lang FROM users WHERE id = ?1`).bind(r.user_id).first();
+    if (u?.lang) lang = u.lang;
+  } catch {}
+
+  const built = await buildPushBody(env, reminder, attempt, lang);
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)
@@ -689,6 +705,7 @@ async function processOneReminder(env, r, vapid, now) {
         fireAt: r.fire_at,
         tone: r.tone,
         pendingCount,
+        lang,
       },
       vapid,
       { ttl: 60, urgency: 'high', topic: 'r-' + r.id },

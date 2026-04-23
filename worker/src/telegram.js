@@ -4,6 +4,125 @@
 const TG_API = 'https://api.telegram.org';
 
 // ============================================================================
+// i18n dlya bot message'ey
+// ============================================================================
+
+const BOT_I18N = {
+  ru: {
+    start_no_code:
+      'Привет! Я бот push.az — буду дублировать твои напоминания сюда.\n\n' +
+      'Чтобы привязать аккаунт, открой push.az в браузере → Настройки → «Привязать Telegram», ' +
+      'получи код и отправь его сюда командой:\n\n/link КОД',
+    unlink_ok: 'Отвязал. Больше не буду беспокоить.',
+    help:
+      'push.az bot — команды:\n\n' +
+      '/link КОД — привязать Telegram к аккаунту push.az\n' +
+      '/unlink — отвязать\n' +
+      '/status — показать текущую привязку\n' +
+      '/help — эта справка\n\n' +
+      'Когда наступит время напоминания — пришлю сюда с кнопками Готово/Отложить.',
+    status_not_linked: 'Этот чат не привязан. Отправь /link КОД.',
+    status_linked: (since) => `Привязан к аккаунту push.az с ${since}.`,
+    unknown: 'Не понял. Отправь /help для списка команд.',
+    bad_code: 'Код неверный или просрочен (живёт 10 минут). Сгенерируй новый в push.az.',
+    linked:
+      '✅ Готово, привязал!\n\n' +
+      'Теперь я буду дублировать твои напоминания в этот чат. ' +
+      'Можешь подтверждать/откладывать прямо кнопками в сообщениях.\n\n' +
+      'Отписка — /unlink.',
+    cb_error: 'Ошибка',
+    cb_not_linked: 'Чат не привязан',
+    cb_done: 'Готово ✔',
+    cb_snoozed: (m) => `Отложено на ${m} мин`,
+    confirmed: 'подтверждено',
+    snoozed_line: (m) => `отложено +${m} мин`,
+    final_prefix: (title) => `ПОСЛЕДНИЙ ЗВОНОК — ${title}`,
+    final_hint: 'Больше пушей не будет. Открой push.az и подтверди.',
+    attempt_line: (a, m) => `Попытка ${a}/${m}`,
+    btn_done: '✅ Готово',
+    btn_10: '⏰ +10 мин',
+    btn_30: '⏰ +30 мин',
+    btn_60: '⏰ +1 ч',
+  },
+  az: {
+    start_no_code:
+      'Salam! Mən push.az botuyam — xatırladıcılarını buraya dublyaj edəcəyəm.\n\n' +
+      'Hesabı bağlamaq üçün push.az-ı brauzerdə aç → Parametrlər → "Telegram-ı bağla", ' +
+      'kodu götür və bura göndər:\n\n/link KOD',
+    unlink_ok: 'Ayırdım. Daha narahat etməyəcəyəm.',
+    help:
+      'push.az bot — əmrlər:\n\n' +
+      '/link KOD — Telegram-ı push.az hesabına bağla\n' +
+      '/unlink — ayır\n' +
+      '/status — cari bağlantını göstər\n' +
+      '/help — bu köməkçi\n\n' +
+      'Xatırlatma vaxtı gələndə — Edildi/Təxirə sal düymələri ilə göndərəcəyəm.',
+    status_not_linked: 'Bu chat bağlı deyil. /link KOD göndər.',
+    status_linked: (since) => `push.az hesabına ${since}-dən bağlıdır.`,
+    unknown: 'Başa düşmədim. Əmrlərin siyahısı üçün /help göndər.',
+    bad_code: 'Kod səhvdir və ya vaxtı keçib (10 dəq işləyir). push.az-da yenisini yarat.',
+    linked:
+      '✅ Hazır, bağlandı!\n\n' +
+      'İndi xatırladıcılarını bu chat-a dublyaj edəcəyəm. ' +
+      'Mesajlardakı düymələrlə birbaşa təsdiq edə və təxirə sala bilərsən.\n\n' +
+      'Ayırmaq — /unlink.',
+    cb_error: 'Xəta',
+    cb_not_linked: 'Chat bağlı deyil',
+    cb_done: 'Hazır ✔',
+    cb_snoozed: (m) => `${m} dəq təxirə salındı`,
+    confirmed: 'təsdiqləndi',
+    snoozed_line: (m) => `təxirə salındı +${m} dəq`,
+    final_prefix: (title) => `SON ZƏNG — ${title}`,
+    final_hint: 'Artıq push gəlməyəcək. push.az-ı aç və təsdiq et.',
+    attempt_line: (a, m) => `Cəhd ${a}/${m}`,
+    btn_done: '✅ Edildi',
+    btn_10: '⏰ +10 dəq',
+    btn_30: '⏰ +30 dəq',
+    btn_60: '⏰ +1 saat',
+  },
+  en: {
+    start_no_code:
+      "Hi! I'm the push.az bot — I'll mirror your reminders here.\n\n" +
+      'To link your account, open push.az in the browser → Settings → "Link Telegram", ' +
+      'grab the code and send it here:\n\n/link CODE',
+    unlink_ok: "Unlinked. I won't bother you again.",
+    help:
+      'push.az bot — commands:\n\n' +
+      '/link CODE — link Telegram to your push.az account\n' +
+      '/unlink — unlink\n' +
+      '/status — show current link\n' +
+      '/help — this help\n\n' +
+      "When it's reminder time — I'll send a message with Done/Snooze buttons.",
+    status_not_linked: 'This chat is not linked. Send /link CODE.',
+    status_linked: (since) => `Linked to push.az account since ${since}.`,
+    unknown: "Didn't get that. Send /help for command list.",
+    bad_code: 'Code is wrong or expired (lives 10 min). Generate a new one in push.az.',
+    linked:
+      "✅ Done, linked!\n\n" +
+      "I'll mirror your reminders to this chat. " +
+      'You can confirm/snooze right from the message buttons.\n\n' +
+      'To unsubscribe — /unlink.',
+    cb_error: 'Error',
+    cb_not_linked: 'Chat not linked',
+    cb_done: 'Done ✔',
+    cb_snoozed: (m) => `Snoozed for ${m} min`,
+    confirmed: 'confirmed',
+    snoozed_line: (m) => `snoozed +${m} min`,
+    final_prefix: (title) => `FINAL CALL — ${title}`,
+    final_hint: "No more pushes. Open push.az and confirm.",
+    attempt_line: (a, m) => `Attempt ${a}/${m}`,
+    btn_done: '✅ Done',
+    btn_10: '⏰ +10 min',
+    btn_30: '⏰ +30 min',
+    btn_60: '⏰ +1 h',
+  },
+};
+
+function dict(lang) {
+  return BOT_I18N[lang] || BOT_I18N.ru;
+}
+
+// ============================================================================
 // Utility
 // ============================================================================
 
@@ -13,7 +132,6 @@ function escMd(s) {
 }
 
 function randomCode(len = 6) {
-  // User-friendly: no 0/O, 1/I, no lowercase
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const buf = new Uint8Array(len);
   crypto.getRandomValues(buf);
@@ -24,10 +142,6 @@ function randomCode(len = 6) {
 
 function tgToken(env) {
   return env.TELEGRAM_BOT_TOKEN;
-}
-
-function tgUsername(env) {
-  return env.TELEGRAM_BOT_USERNAME || 'push_az_bot';
 }
 
 // ============================================================================
@@ -84,34 +198,30 @@ async function tgEditMessage(env, chatId, messageId, text, extra = {}) {
 
 const TONE_EMOJI = { friendly: '💜', urgent: '⚡️', funny: '😆', aggressive: '🔥' };
 
-export function formatReminderMessage(reminder, bodyText, attempt, maxAttempts) {
+export function formatReminderMessage(reminder, bodyText, attempt, maxAttempts, lang = 'ru') {
+  const L = dict(lang);
   const isFinal = attempt >= maxAttempts;
   const emoji = isFinal ? '🚨' : (TONE_EMOJI[reminder.tone] || '🔔');
-  const rawTitle = isFinal
-    ? `POSLEDNIY ZVONOK — ${reminder.title}`
-    : reminder.title;
+  const rawTitle = isFinal ? L.final_prefix(reminder.title) : reminder.title;
   const title = escMd(rawTitle);
   const body = escMd(bodyText);
   const note = reminder.note ? `\n\n_${escMd(reminder.note)}_` : '';
-  const header = isFinal
-    ? `\n\n${escMd('Bolshe pushei ne budet. Otkroy push.az i podtverdi.')}`
-    : '';
-  const attemptLine = attempt > 1
-    ? `\n\n_${escMd(`Popytka ${attempt}/${maxAttempts}`)}_`
-    : '';
+  const header = isFinal ? `\n\n${escMd(L.final_hint)}` : '';
+  const attemptLine = attempt > 1 ? `\n\n_${escMd(L.attempt_line(attempt, maxAttempts))}_` : '';
   return `${emoji} *${title}*\n\n${body}${note}${header}${attemptLine}`;
 }
 
-export function reminderInlineKeyboard(reminderId) {
+export function reminderInlineKeyboard(reminderId, lang = 'ru') {
+  const L = dict(lang);
   return {
     inline_keyboard: [
       [
-        { text: '✅ Gotovo', callback_data: `ack:${reminderId}` },
-        { text: '⏰ +10 min', callback_data: `snooze:${reminderId}:10` },
+        { text: L.btn_done, callback_data: `ack:${reminderId}` },
+        { text: L.btn_10, callback_data: `snooze:${reminderId}:10` },
       ],
       [
-        { text: '⏰ +30 min', callback_data: `snooze:${reminderId}:30` },
-        { text: '⏰ +1 ch', callback_data: `snooze:${reminderId}:60` },
+        { text: L.btn_30, callback_data: `snooze:${reminderId}:30` },
+        { text: L.btn_60, callback_data: `snooze:${reminderId}:60` },
       ],
     ],
   };
@@ -119,8 +229,27 @@ export function reminderInlineKeyboard(reminderId) {
 
 // ============================================================================
 // Send reminder notification to all linked Telegram chats of a user
-// Returns { sent, failed }
 // ============================================================================
+
+async function getUserLang(env, userId) {
+  try {
+    const row = await env.DB.prepare(`SELECT lang FROM users WHERE id = ?1`).bind(userId).first();
+    return row?.lang || 'ru';
+  } catch {
+    return 'ru';
+  }
+}
+
+async function getChatLang(env, chatId) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT u.lang AS lang FROM telegram_links tl JOIN users u ON u.id = tl.user_id WHERE tl.chat_id = ?1`,
+    ).bind(chatId).first();
+    return row?.lang || 'ru';
+  } catch {
+    return 'ru';
+  }
+}
 
 export async function tgSendReminderToUser(env, userId, reminder, bodyText, attempt, maxAttempts) {
   const chats = await env.DB.prepare(
@@ -132,8 +261,9 @@ export async function tgSendReminderToUser(env, userId, reminder, bodyText, atte
   const list = chats.results || [];
   if (!list.length) return { sent: 0, failed: 0 };
 
-  const text = formatReminderMessage(reminder, bodyText, attempt, maxAttempts);
-  const keyboard = reminderInlineKeyboard(reminder.id);
+  const lang = await getUserLang(env, userId);
+  const text = formatReminderMessage(reminder, bodyText, attempt, maxAttempts, lang);
+  const keyboard = reminderInlineKeyboard(reminder.id, lang);
 
   let sent = 0;
   let failed = 0;
@@ -145,7 +275,6 @@ export async function tgSendReminderToUser(env, userId, reminder, bodyText, atte
       if (res.ok) sent++;
       else {
         failed++;
-        // Esli bot zablokirovan ili chat udalёn — убираем privyazku
         const code = res.error_code;
         if (code === 403 || code === 400) {
           if (res.description?.includes('bot was blocked') || res.description?.includes('chat not found')) {
@@ -168,7 +297,6 @@ export async function tgSendReminderToUser(env, userId, reminder, bodyText, atte
 export async function createLinkCode(env, userId) {
   const now = Date.now();
   const expires = now + 10 * 60_000;
-  // Do 5 popytok sgenerirovat' unikalnyy kod
   for (let i = 0; i < 5; i++) {
     const code = randomCode(6);
     try {
@@ -179,7 +307,6 @@ export async function createLinkCode(env, userId) {
         .run();
       return { code, expiresAt: expires };
     } catch (err) {
-      // kod uzhe zanyat (ochen malovероyatno) — povtoryaem
       continue;
     }
   }
@@ -206,7 +333,6 @@ async function consumeLinkCode(env, code) {
 // ============================================================================
 
 export async function handleTelegramWebhook(request, env) {
-  // Verify secret
   const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET;
   if (expectedSecret) {
     const got = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
@@ -228,8 +354,17 @@ export async function handleTelegramWebhook(request, env) {
     console.error('[tg] webhook error', err?.message || err, err?.stack);
   }
 
-  // Telegram always expects 200 quickly
   return new Response('ok');
+}
+
+// Pytayemsya vybrat' yazik po: (1) uzhe privyazannomu user.lang, (2) Telegram language_code, (3) 'ru'
+function pickChatLangForMessage(existingLang, from) {
+  if (existingLang && BOT_I18N[existingLang]) return existingLang;
+  const code = (from?.language_code || '').toLowerCase();
+  if (code.startsWith('az')) return 'az';
+  if (code.startsWith('en')) return 'en';
+  if (code.startsWith('ru')) return 'ru';
+  return 'ru';
 }
 
 async function handleMessage(env, message) {
@@ -238,51 +373,39 @@ async function handleMessage(env, message) {
   const chatId = chat.id;
   const text = (message.text || '').trim();
 
-  // /start <code>  — privyazka
+  const linkedLang = await getChatLang(env, chatId);
+  const lang = pickChatLangForMessage(linkedLang, message.from);
+  const L = dict(lang);
+
   const startMatch = text.match(/^\/start(?:@\w+)?(?:\s+([A-Z0-9]+))?/i);
   if (startMatch) {
     const code = (startMatch[1] || '').toUpperCase();
     if (!code) {
-      await tgSendMessage(env, chatId, escMd(
-        `Privet! Ya bot push.az — budu dublirovat' tvoi reminder'y syuda.\n\n` +
-        `Chtob privyazat' akkaunt, otkroi push.az v brauzere → Nastroyki → "Privyazat' Telegram", ` +
-        `poluchish' kod i otpravь ego syuda komandoy:\n\n/link KOD`,
-      ));
+      await tgSendMessage(env, chatId, escMd(L.start_no_code));
       return;
     }
-    await linkChat(env, chatId, message.from, code);
+    await linkChat(env, chatId, message.from, code, lang);
     return;
   }
 
-  // /link <code>
   const linkMatch = text.match(/^\/link(?:@\w+)?\s+([A-Z0-9]+)/i);
   if (linkMatch) {
     const code = linkMatch[1].toUpperCase();
-    await linkChat(env, chatId, message.from, code);
+    await linkChat(env, chatId, message.from, code, lang);
     return;
   }
 
-  // /unlink
   if (/^\/unlink(?:@\w+)?$/i.test(text)) {
     await env.DB.prepare(`DELETE FROM telegram_links WHERE chat_id = ?1`).bind(chatId).run();
-    await tgSendMessage(env, chatId, escMd('Otvyazal. Bolshe ne budu bespokoit\u2019.'));
+    await tgSendMessage(env, chatId, escMd(L.unlink_ok));
     return;
   }
 
-  // /help
   if (/^\/help(?:@\w+)?$/i.test(text)) {
-    await tgSendMessage(env, chatId, escMd(
-      `push.az bot — komandy:\n\n` +
-      `/link KOD — privyazat' Telegram k akkauntu push.az\n` +
-      `/unlink — otvyazat'\n` +
-      `/status — pokazat' tekuschuyu privyazku\n` +
-      `/help — eta spravka\n\n` +
-      `Kogda nastupit vremya reminder'a — prishlyu syuda s knopkami Gotovo/Otlozhit'.`,
-    ));
+    await tgSendMessage(env, chatId, escMd(L.help));
     return;
   }
 
-  // /status
   if (/^\/status(?:@\w+)?$/i.test(text)) {
     const row = await env.DB.prepare(
       `SELECT * FROM telegram_links WHERE chat_id = ?1`,
@@ -290,27 +413,27 @@ async function handleMessage(env, message) {
       .bind(chatId)
       .first();
     if (!row) {
-      await tgSendMessage(env, chatId, escMd('Etot chat ne privyazan. Otprav\u2019 /link KOD.'));
+      await tgSendMessage(env, chatId, escMd(L.status_not_linked));
     } else {
       const since = new Date(row.linked_at).toISOString().slice(0, 10);
-      await tgSendMessage(env, chatId, escMd(`Privyazan k akkauntu push.az s ${since}.`));
+      await tgSendMessage(env, chatId, escMd(L.status_linked(since)));
     }
     return;
   }
 
-  // Prosто tekst — otvechayem spravkoy yesli chat ne privyazan
   const linked = await env.DB.prepare(`SELECT 1 FROM telegram_links WHERE chat_id = ?1`)
     .bind(chatId)
     .first();
   if (!linked) {
-    await tgSendMessage(env, chatId, escMd('Ne ponyal. Otprav\u2019 /help dlya spiska komand.'));
+    await tgSendMessage(env, chatId, escMd(L.unknown));
   }
 }
 
-async function linkChat(env, chatId, from, code) {
+async function linkChat(env, chatId, from, code, lang) {
+  const L = dict(lang);
   const row = await consumeLinkCode(env, code);
   if (!row) {
-    await tgSendMessage(env, chatId, escMd('Kod nevernyy ili protuchen (zhivyot 10 minut). Sgenerируй novyy v push.az.'));
+    await tgSendMessage(env, chatId, escMd(L.bad_code));
     return;
   }
 
@@ -331,20 +454,21 @@ async function linkChat(env, chatId, from, code) {
     .bind(chatId, row.user_id, username, firstName, now)
     .run();
 
-  await tgSendMessage(env, chatId, escMd(
-    `\u2705 Gotovo, privyazal!\n\n` +
-    `Teper' ya budu dublirovat' tvoi reminder'y v etot chat. ` +
-    `Mozhesh' podtverzhdat'/otkladyvat' pryamo knopkami v soobsheniyakh.\n\n` +
-    `Otpiska — /unlink.`,
-  ));
+  // Berem yazyk iz user zapisi (on mog bit' nastroen v PWA)
+  const userLang = await getUserLang(env, row.user_id);
+  const LL = dict(userLang);
+  await tgSendMessage(env, chatId, escMd(LL.linked));
 }
 
 async function handleCallbackQuery(env, cq) {
   const data = cq.data || '';
   const chatId = cq.message?.chat?.id;
   const messageId = cq.message?.message_id;
+  const lang = await getChatLang(env, chatId);
+  const L = dict(lang);
+
   if (!chatId || !messageId) {
-    await tgAnswerCallback(env, cq.id, 'Oshibka');
+    await tgAnswerCallback(env, cq.id, L.cb_error);
     return;
   }
 
@@ -352,7 +476,7 @@ async function handleCallbackQuery(env, cq) {
     .bind(chatId)
     .first();
   if (!link) {
-    await tgAnswerCallback(env, cq.id, 'Chat ne privyazan');
+    await tgAnswerCallback(env, cq.id, L.cb_not_linked);
     return;
   }
 
@@ -366,11 +490,10 @@ async function handleCallbackQuery(env, cq) {
 
   if (action === 'ack') {
     await ackReminderFromTelegram(env, link.user_id, reminderId);
-    await tgAnswerCallback(env, cq.id, 'Gotovo \u2714');
-    // Edit soobsheniye — ubираem knopки
+    await tgAnswerCallback(env, cq.id, L.cb_done);
     const origText = cq.message?.text || '';
     const safe = escMd(origText);
-    await tgEditMessage(env, chatId, messageId, safe + '\n\n\u2705 *' + escMd('podtverzhdeno') + '*', {
+    await tgEditMessage(env, chatId, messageId, safe + '\n\n✅ *' + escMd(L.confirmed) + '*', {
       reply_markup: { inline_keyboard: [] },
     });
     return;
@@ -379,10 +502,10 @@ async function handleCallbackQuery(env, cq) {
   if (action === 'snooze') {
     const minutes = Number(parts[2]) || 10;
     await snoozeReminderFromTelegram(env, link.user_id, reminderId, minutes);
-    await tgAnswerCallback(env, cq.id, `Otlozheno na ${minutes} min`);
+    await tgAnswerCallback(env, cq.id, L.cb_snoozed(minutes));
     const origText = cq.message?.text || '';
     const safe = escMd(origText);
-    await tgEditMessage(env, chatId, messageId, safe + '\n\n\u23f0 *' + escMd(`otlozheno +${minutes} min`) + '*', {
+    await tgEditMessage(env, chatId, messageId, safe + '\n\n⏰ *' + escMd(L.snoozed_line(minutes)) + '*', {
       reply_markup: { inline_keyboard: [] },
     });
     return;
@@ -436,9 +559,7 @@ async function snoozeReminderFromTelegram(env, userId, reminderId, minutes) {
   ).bind(nextFire, now, reminderId).run();
 }
 
-// Duplikat logiki iz index.js (proposhe chem import)
 function computeNextFireAt(currentFireAt, repeat, now) {
-  const d = new Date(currentFireAt);
   let next = currentFireAt;
   while (next <= now) {
     const nd = new Date(next);

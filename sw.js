@@ -1,12 +1,13 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v5';
+const CACHE = 'push-az-v7';
 const ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.js',
   '/db.js',
+  '/i18n.js',
   '/manifest.webmanifest',
   '/icons/icon.svg',
   '/icons/icon-maskable.svg',
@@ -88,13 +89,44 @@ self.addEventListener('fetch', (event) => {
 // Push event
 // ============================================================================
 
+const SW_I18N = {
+  ru: {
+    default_body: 'Пора!',
+    default_notif_body: 'Уведомление',
+    final_prefix: '🚨 ПОСЛЕДНИЙ ЗВОНОК — ',
+    action_open: 'Открыть и подтвердить',
+    action_snooze: 'Отложить 10 мин',
+  },
+  az: {
+    default_body: 'Vaxtıdır!',
+    default_notif_body: 'Bildiriş',
+    final_prefix: '🚨 SON ZƏNG — ',
+    action_open: 'Aç və təsdiq et',
+    action_snooze: '10 dəq təxirə',
+  },
+  en: {
+    default_body: 'Time!',
+    default_notif_body: 'Notification',
+    final_prefix: '🚨 FINAL CALL — ',
+    action_open: 'Open and confirm',
+    action_snooze: 'Snooze 10 min',
+  },
+};
+
+function swDict(lang) {
+  return SW_I18N[lang] || SW_I18N.ru;
+}
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'push.az', body: event.data ? event.data.text() : 'Uvedomleniye' };
+    data = { title: 'push.az', body: event.data ? event.data.text() : '' };
   }
+
+  const L = swDict(data.lang);
+  if (!data.body && !('title' in data)) data.body = L.default_notif_body;
 
   const reminderId = data.reminderId || '';
   const isReminder = data.type === 'reminder' && reminderId && reminderId !== 'test';
@@ -106,11 +138,11 @@ self.addEventListener('push', (event) => {
   const urgent = attempt >= 3;
   const isFinal = isReminder && attempt >= maxAttempts;
   let title = data.title || 'push.az';
-  if (isFinal) title = '\ud83d\udea8 POSLEDNIY ZVONOK \u2014 ' + title;
+  if (isFinal) title = L.final_prefix + title;
   else if (urgent) title = title + ' \u203c';
 
   const options = {
-    body: data.body || 'Vremya!',
+    body: data.body || L.default_body,
     icon: urgent || isFinal ? '/icons/icon-alert-512.png' : '/icons/icon-512.png',
     badge: '/icons/icon-192.png',
     // Na finalnoy popytke ne kollapsirovat' s predyduschimi (unikalnyy tag)
@@ -134,8 +166,8 @@ self.addEventListener('push', (event) => {
   // chtoby nel'zya bylo "avtoматom" ubit' napominaniye.
   if (isReminder || data.type === 'test') {
     options.actions = [
-      { action: 'open', title: 'Otkryt\u2019 i podtverdit\u2019' },
-      { action: 'snooze', title: 'Otlozhit\u2019 10m' },
+      { action: 'open', title: L.action_open },
+      { action: 'snooze', title: L.action_snooze },
     ];
   }
 

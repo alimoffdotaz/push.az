@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
-  <meta name="description" content="push.az — anti banner-blindness reminder s unikal'nymi pushami" />
+  <meta name="description" content="push.az — reminder, который точно донесёт уведомление" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon-64.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>push.az — Osobyy Reminder</title>
+  <title>push.az — Особый reminder</title>
 </head>
 <body>
   <div class="app">
@@ -30,15 +30,15 @@
         </div>
         <div class="brand-text">
           <h1>push.az</h1>
-          <p class="tagline">Osobyy reminder · unikal’nyy push kazhdyy raz</p>
+          <p class="tagline" data-i18n="header.tagline">Особый reminder · уникальный push каждый раз</p>
         </div>
       </div>
       <div class="header-actions">
-        <span id="push-status-pill" class="pill pill-muted">Offline rezhim</span>
+        <span id="push-status-pill" class="pill pill-muted" data-i18n="header.offline">Оффлайн</span>
         <button id="permission-btn" class="btn btn-ghost" hidden>
-          <span class="dot"></span> Razreshit’
+          <span class="dot"></span> <span data-i18n="header.permission">Разрешить</span>
         </button>
-        <button id="settings-btn" class="icon-btn" aria-label="Nastroyki" title="Nastroyki">
+        <button id="settings-btn" class="icon-btn" data-i18n-aria-label="header.settings" data-i18n-title="header.settings" aria-label="Настройки" title="Настройки">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
@@ -54,17 +54,17 @@
           </svg>
         </div>
         <div class="install-banner-text">
-          <strong>Ustanovi push.az</strong>
-          <span id="install-banner-hint">Chtoby push rabotal nadyozhno i v uvedomleniyakh OS poyavilsya push.az.</span>
+          <strong data-i18n="install.title">Установи push.az</strong>
+          <span id="install-banner-hint" data-i18n="install.hint">Чтобы push работал надёжно и в списке уведомлений появился push.az.</span>
         </div>
         <div class="install-banner-actions">
-          <button type="button" id="install-btn" class="btn btn-primary btn-small" hidden>
-            Ustanovit’
+          <button type="button" id="install-btn" class="btn btn-primary btn-small" hidden data-i18n="install.btn">
+            Установить
           </button>
-          <button type="button" id="install-how-btn" class="btn btn-ghost btn-small">
-            Kak?
+          <button type="button" id="install-how-btn" class="btn btn-ghost btn-small" data-i18n="install.how">
+            Как?
           </button>
-          <button type="button" id="install-dismiss-btn" class="icon-btn" aria-label="Zakryt’">
+          <button type="button" id="install-dismiss-btn" class="icon-btn" data-i18n-aria-label="header.close" aria-label="Закрыть">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -73,66 +73,20 @@
     </section>
 
     <main class="app-main">
-      <section class="composer card">
-        <h2 class="section-title">Novyy reminder</h2>
-        <form id="reminder-form" class="form" autocomplete="off">
-          <label class="field">
-            <span>Nazvaniye</span>
-            <input id="title" name="title" type="text" maxlength="80"
-              placeholder="Naprimer: Prinyat’ lekarstvo" required />
-          </label>
-
-          <label class="field">
-            <span>Zametka (neobyazatel’no)</span>
-            <textarea id="note" name="note" rows="2" maxlength="280"
-              placeholder="Podrobnosti, ssylka, kontekst..."></textarea>
-          </label>
-
-          <div class="field-row">
-            <label class="field">
-              <span>Data i vremya</span>
-              <input id="when" name="when" type="datetime-local" required />
-            </label>
-
-            <label class="field">
-              <span>Povtor</span>
-              <select id="repeat" name="repeat">
-                <option value="none">Bez povtora</option>
-                <option value="daily">Kazhdyy den’</option>
-                <option value="weekly">Kazhduyu nedelyu</option>
-                <option value="monthly">Kazhdyy mesyats</option>
-              </select>
-            </label>
-          </div>
-
-          <label class="field">
-            <span>Ton uvedomleniy</span>
-            <select id="tone" name="tone">
-              <option value="friendly">💜 Teplo — podderzhivayushche, bez davleniya</option>
-              <option value="urgent">⚡ Srochno — kratko i naporno</option>
-              <option value="funny">😆 Smeshno — s yumorom</option>
-              <option value="aggressive">🔥 Zhyostko — kak strogiy trener</option>
-            </select>
-          </label>
-
-          <div class="form-actions">
-            <button type="button" id="reset-btn" class="btn btn-ghost">Sbrosit’</button>
-            <button type="submit" class="btn btn-primary">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Dobavit’
-            </button>
-          </div>
-        </form>
-      </section>
-
       <section class="reminders">
         <div class="reminders-header">
-          <h2 class="section-title">Predstoyashchiye</h2>
+          <h2 class="section-title" data-i18n="reminders.active">Активные</h2>
           <span id="count-badge" class="badge">0</span>
         </div>
+
+        <button type="button" id="open-composer-btn" class="btn btn-primary btn-large create-reminder-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span data-i18n="reminders.create">Создать напоминание</span>
+        </button>
+
         <ul id="reminders-list" class="reminders-list"></ul>
         <div id="empty-state" class="empty-state card" hidden>
           <div class="empty-icon" aria-hidden="true">
@@ -140,14 +94,14 @@
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
           </div>
-          <h3>Poka pusto</h3>
-          <p>Sozday svoy pervyy reminder vyshe — push pridyot vovremya, i kazhdyy raz s drugim tekstom.</p>
+          <h3 data-i18n="reminders.empty_title">Пока пусто</h3>
+          <p data-i18n="reminders.empty_hint">Нажми «Создать напоминание» — push придёт вовремя и каждый раз с другим текстом.</p>
         </div>
       </section>
 
       <section class="past card" id="past-section" hidden>
         <details>
-          <summary class="section-title">Arkhiv (proshedshiye)</summary>
+          <summary class="section-title" data-i18n="reminders.archive">Архив</summary>
           <ul id="past-list" class="reminders-list compact"></ul>
         </details>
       </section>
@@ -156,17 +110,81 @@
     <footer class="app-footer">
       <small>
         push.az · <span id="install-hint" hidden></span>
-        <a href="#" id="test-notification">Test-uvedomleniye</a>
+        <a href="#" id="test-notification" data-i18n="settings.test_challenge">Тестовое уведомление</a>
       </small>
     </footer>
   </div>
 
-  <!-- Takeover: polnoekrannyy ekran pri neotvechennykh reminderakh -->
+  <!-- Модалка создания reminder'а -->
+  <dialog id="composer-dialog" class="composer-dialog">
+    <form id="reminder-form" class="composer-form" method="dialog" autocomplete="off">
+      <header class="composer-header">
+        <h3 data-i18n="composer.new">Новое напоминание</h3>
+        <button type="button" class="icon-btn" data-close-composer data-i18n-aria-label="header.close" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </header>
+
+      <label class="field">
+        <span data-i18n="composer.title_label">Название</span>
+        <input id="title" name="title" type="text" maxlength="80"
+          data-i18n-placeholder="composer.title_ph"
+          placeholder="Например: Принять лекарство" required />
+      </label>
+
+      <label class="field">
+        <span data-i18n="composer.note_label">Заметка (необязательно)</span>
+        <textarea id="note" name="note" rows="2" maxlength="280"
+          data-i18n-placeholder="composer.note_ph"
+          placeholder="Подробности, ссылка, контекст…"></textarea>
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span data-i18n="composer.when">Дата и время</span>
+          <input id="when" name="when" type="datetime-local" required />
+        </label>
+
+        <label class="field">
+          <span data-i18n="composer.repeat">Повтор</span>
+          <select id="repeat" name="repeat">
+            <option value="none" data-i18n="composer.repeat.none">Без повтора</option>
+            <option value="daily" data-i18n="composer.repeat.daily">Каждый день</option>
+            <option value="weekly" data-i18n="composer.repeat.weekly">Каждую неделю</option>
+            <option value="monthly" data-i18n="composer.repeat.monthly">Каждый месяц</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="field">
+        <span data-i18n="composer.tone">Тон уведомлений</span>
+        <select id="tone" name="tone">
+          <option value="friendly" data-i18n="composer.tone.friendly">💜 Тепло — поддерживающе, без давления</option>
+          <option value="urgent" data-i18n="composer.tone.urgent">⚡ Срочно — кратко и напористо</option>
+          <option value="funny" data-i18n="composer.tone.funny">😆 Смешно — с юмором</option>
+          <option value="aggressive" data-i18n="composer.tone.aggressive">🔥 Жёстко — как строгий тренер</option>
+        </select>
+      </label>
+
+      <div class="form-actions">
+        <button type="button" id="reset-btn" class="btn btn-ghost" data-close-composer data-i18n="composer.cancel">Отмена</button>
+        <button type="submit" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span data-i18n="composer.submit">Создать</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Takeover: полноэкранный экран при пропущенных напоминаниях -->
   <div id="takeover" class="takeover" hidden>
     <div class="takeover-backdrop"></div>
     <div class="takeover-content">
       <div class="takeover-pulse" aria-hidden="true"></div>
-      <div class="takeover-label">NAPOMINANIYE</div>
+      <div class="takeover-label" data-i18n="takeover.label">НАПОМИНАНИЕ</div>
       <h2 id="takeover-title" class="takeover-title"></h2>
       <p id="takeover-note" class="takeover-note" hidden></p>
       <div id="takeover-counter" class="takeover-counter" hidden></div>
@@ -178,90 +196,97 @@
       </div>
 
       <div class="takeover-actions">
-        <button id="takeover-snooze" class="takeover-btn takeover-btn-secondary">
-          Otlozhit’ na 10 min
+        <button id="takeover-snooze" class="takeover-btn takeover-btn-secondary" data-i18n="takeover.snooze10">
+          Отложить на 10 мин
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Settings dialog -->
+  <!-- Настройки -->
   <dialog id="settings-dialog" class="settings-dialog">
     <form id="settings-form" class="settings-form" method="dialog">
       <header class="settings-header">
-        <h3>Nastroyki</h3>
-        <button type="button" class="icon-btn" data-close-settings aria-label="Zakryt’">
+        <h3 data-i18n="settings.title">Настройки</h3>
+        <button type="button" class="icon-btn" data-close-settings data-i18n-aria-label="header.close" aria-label="Закрыть">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </header>
 
       <label class="field">
-        <span>Cloudflare Worker URL</span>
+        <span data-i18n="settings.lang">Язык</span>
+        <select id="settings-lang">
+          <option value="ru">Русский</option>
+          <option value="az">Azərbaycan</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span data-i18n="settings.worker_url">Cloudflare Worker URL</span>
         <input id="settings-worker-url" type="url" placeholder="https://push-az-worker.xxx.workers.dev"
           autocomplete="off" spellcheck="false" />
       </label>
-      <p class="hint">
-        Otkroy <code>tools/vapid-gen.html</code> chtoby sgenerirovat’ VAPID klyuchi,
-        potom zadeploy Worker (papka <code>worker/</code>) i vstav’ yego URL syuda.
-        Bez URL app rabotayet lokal’no i push prikhodit tol’ko poka app otkryt.
+      <p class="hint" data-i18n="settings.worker_hint">
+        Без URL приложение работает локально — push будет приходить, только пока app открыт.
       </p>
 
       <div class="settings-diagnostics">
-        <button type="button" class="btn btn-ghost btn-small" id="test-badge-btn">
-          Test badge (3)
+        <button type="button" class="btn btn-ghost btn-small" id="test-badge-btn" data-i18n="settings.test_badge">
+          Тест бейджа
         </button>
-        <button type="button" class="btn btn-ghost btn-small" id="clear-badge-btn">
-          Sbrosit’ badge
+        <button type="button" class="btn btn-ghost btn-small" id="clear-badge-btn" data-i18n="settings.clear_badge">
+          Сбросить бейдж
         </button>
-        <button type="button" class="btn btn-ghost btn-small" id="test-challenge-btn">
-          Test challenge
+        <button type="button" class="btn btn-ghost btn-small" id="test-challenge-btn" data-i18n="settings.test_challenge">
+          Тест challenge
         </button>
-        <button type="button" class="btn btn-ghost btn-small" id="clear-missed-btn">
-          Ochistit’ propushchennye
+        <button type="button" class="btn btn-ghost btn-small" id="clear-missed-btn" data-i18n="settings.clear_missed">
+          Очистить пропущенные
         </button>
       </div>
 
       <div id="settings-status" class="settings-status"></div>
 
       <div class="settings-telegram" id="settings-telegram" hidden>
-        <h4>Telegram <span class="chip">dublirovaniye</span></h4>
-        <p class="muted settings-telegram-hint">
-          Privyazhi Telegram — reminder'y budut prikhodit' i v chat s botom.
-          Rabotayet dazhe yesli brauzer/iPhone nedostupen.
+        <h4><span data-i18n="tg.title">Telegram</span> <span class="chip" data-i18n="tg.chip">дублирование</span></h4>
+        <p class="muted settings-telegram-hint" data-i18n="tg.hint">
+          Привяжи Telegram — напоминания будут приходить и в чат с ботом.
+          Работает даже если браузер/iPhone недоступен.
         </p>
         <div id="settings-tg-empty" class="settings-tg-empty">
-          <button type="button" class="btn btn-primary btn-small" id="tg-link-btn">
-            Privyazat’ Telegram
+          <button type="button" class="btn btn-primary btn-small" id="tg-link-btn" data-i18n="tg.link_btn">
+            Привязать Telegram
           </button>
         </div>
         <div id="settings-tg-code" class="settings-tg-code" hidden>
-          <div class="settings-tg-code-label">Tvoy kod:</div>
+          <div class="settings-tg-code-label" data-i18n="tg.your_code">Твой код:</div>
           <div class="settings-tg-code-value" id="tg-code-value">——————</div>
-          <a id="tg-deep-link" href="#" target="_blank" rel="noopener" class="btn btn-primary btn-small">
-            Otkryt’ bota v Telegram
+          <a id="tg-deep-link" href="#" target="_blank" rel="noopener" class="btn btn-primary btn-small" data-i18n="tg.open_bot">
+            Открыть бота в Telegram
           </a>
           <p class="muted small">
-            Ili vruchnuyu: otkroi Telegram, naydi bota
+            <span data-i18n="tg.manual_hint">Или вручную: открой Telegram, найди бота</span>
             <strong id="tg-bot-username">@push_az_bot</strong>,
-            otprav' emu: <code id="tg-link-cmd">/link ——————</code>
+            <span data-i18n="tg.manual_send">отправь ему:</span> <code id="tg-link-cmd">/link ——————</code>
           </p>
-          <button type="button" class="btn btn-ghost btn-small" id="tg-check-btn">
-            Ya otpravil — proverit’
+          <button type="button" class="btn btn-ghost btn-small" id="tg-check-btn" data-i18n="tg.check">
+            Я отправил — проверить
           </button>
-          <button type="button" class="btn btn-ghost btn-small" id="tg-cancel-btn">
-            Otmenit’
+          <button type="button" class="btn btn-ghost btn-small" id="tg-cancel-btn" data-i18n="tg.cancel">
+            Отменить
           </button>
         </div>
         <div id="settings-tg-linked" class="settings-tg-linked" hidden>
           <ul id="tg-links-list" class="tg-links-list"></ul>
-          <button type="button" class="btn btn-ghost btn-small" id="tg-add-more-btn">
-            Privyazat’ eshche chat
+          <button type="button" class="btn btn-ghost btn-small" id="tg-add-more-btn" data-i18n="tg.add_more">
+            Привязать ещё чат
           </button>
         </div>
       </div>
 
       <div class="settings-account" id="settings-account" hidden>
-        <h4>Akkaunt</h4>
+        <h4 data-i18n="acc.title">Аккаунт</h4>
         <div class="settings-account-info">
           <div>
             <strong id="settings-user-name">—</strong>
@@ -269,23 +294,23 @@
           </div>
         </div>
         <div class="settings-account-actions">
-          <button type="button" class="btn btn-ghost btn-small" id="add-passkey-btn">
-            Dobavit’ passkey na drugom ustroystve
+          <button type="button" class="btn btn-ghost btn-small" id="add-passkey-btn" data-i18n="acc.add_passkey">
+            Добавить passkey на другом устройстве
           </button>
-          <button type="button" class="btn btn-ghost btn-small btn-danger" id="logout-btn">
-            Vyyti iz akkaunta
+          <button type="button" class="btn btn-ghost btn-small btn-danger" id="logout-btn" data-i18n="acc.logout">
+            Выйти из аккаунта
           </button>
         </div>
       </div>
 
       <footer class="settings-actions">
-        <button type="button" class="btn btn-ghost" data-close-settings>Otmenit’</button>
-        <button type="submit" class="btn btn-primary">Sokhranit’</button>
+        <button type="button" class="btn btn-ghost" data-close-settings data-i18n="settings.cancel">Отмена</button>
+        <button type="submit" class="btn btn-primary" data-i18n="settings.save">Сохранить</button>
       </footer>
     </form>
   </dialog>
 
-  <!-- Auth ekran: poyavlyayetsya yesli polzovatel ne voshel -->
+  <!-- Экран входа -->
   <div id="auth-screen" class="auth-screen" hidden>
     <div class="auth-card">
       <div class="auth-brand">
@@ -296,16 +321,24 @@
           </svg>
         </div>
         <h2>push.az</h2>
-        <p class="auth-tagline">Voydi chtoby reminder'y sinkhronizirovalis' na vsekh tvoikh ustroystvakh</p>
+        <p class="auth-tagline" data-i18n="auth.tagline">Войди, чтобы напоминания синхронизировались на всех твоих устройствах</p>
+      </div>
+
+      <div class="auth-lang-row">
+        <select id="auth-lang">
+          <option value="ru">Русский</option>
+          <option value="az">Azərbaycan</option>
+          <option value="en">English</option>
+        </select>
       </div>
 
       <div class="auth-worker-row" id="auth-worker-row">
         <label class="field">
-          <span>Cloudflare Worker URL</span>
+          <span data-i18n="settings.worker_url">Cloudflare Worker URL</span>
           <input id="auth-worker-url" type="url" placeholder="https://push-az-worker.xxx.workers.dev"
             autocomplete="off" spellcheck="false" />
         </label>
-        <button type="button" class="btn btn-ghost btn-small" id="auth-save-worker">Sokhranit’ URL</button>
+        <button type="button" class="btn btn-ghost btn-small" id="auth-save-worker" data-i18n="auth.save_url">Сохранить URL</button>
       </div>
 
       <div class="auth-actions" id="auth-actions" hidden>
@@ -313,25 +346,27 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
-          Voyti s passkey
+          <span data-i18n="auth.login">Войти с passkey</span>
         </button>
 
-        <div class="auth-divider"><span>ili</span></div>
+        <div class="auth-divider"><span data-i18n="auth.or">или</span></div>
 
         <form id="auth-register-form" class="auth-register">
           <label class="field">
-            <span>Imya (lyuboye)</span>
-            <input id="auth-display-name" type="text" maxlength="60" placeholder="Naprimer: Ayxan" required />
+            <span data-i18n="auth.name_label">Имя (любое)</span>
+            <input id="auth-display-name" type="text" maxlength="60"
+              data-i18n-placeholder="auth.name_ph"
+              placeholder="Например: Айхан" required />
           </label>
-          <button type="submit" class="btn btn-secondary btn-large">
-            Sozdat’ akkaunt
+          <button type="submit" class="btn btn-secondary btn-large" data-i18n="auth.register">
+            Создать аккаунт
           </button>
         </form>
 
-        <p class="auth-hint">
-          Passkey — eto bezopasnyy vkhod po Face ID / Touch ID / Windows Hello. Nikakikh parol'ey.
-          Tvoy akkaunt privyazan k passkey na etom ustroystve — na drugikh ustroystvakh zalogin'sya
-          cherez iCloud Keychain / Google Password Manager ili dobavь novyy passkey iz nastroyek.
+        <p class="auth-hint" data-i18n="auth.hint">
+          Passkey — это безопасный вход по Face ID / Touch ID / Windows Hello. Никаких паролей.
+          Аккаунт привязан к passkey на этом устройстве. На других устройствах залогинься через
+          iCloud Keychain / Google Password Manager или добавь новый passkey из настроек.
         </p>
       </div>
 
@@ -357,7 +392,7 @@
         </p>
       </div>
       <div class="reminder-actions">
-        <button class="icon-btn icon-btn-danger" data-action="delete" title="Udalit'" aria-label="Udalit'">
+        <button class="icon-btn icon-btn-danger" data-action="delete" data-i18n-title="reminders.delete" data-i18n-aria-label="reminders.delete" title="Удалить" aria-label="Удалить">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
         </button>
       </div>

@@ -1,4 +1,14 @@
 import { db, config } from '/db.js';
+import {
+  t,
+  getLang,
+  setLang,
+  onLangChange,
+  detectBrowserLang,
+  localeFor,
+  applyTranslations,
+  SUPPORTED_LANGS,
+} from '/i18n.js';
 
 // ============================================================================
 // State
@@ -63,15 +73,13 @@ const takeoverChallengeHint = $('#takeover-challenge-hint');
 // Constants
 // ============================================================================
 
-const REPEAT_LABEL = {
-  none: '',
-  daily: 'yezhednevno',
-  weekly: 'yezhenedel\u2019no',
-  monthly: 'yezhemesyachno',
-};
+function repeatLabel(repeat) {
+  if (!repeat || repeat === 'none') return '';
+  return t('repeat.' + repeat);
+}
 
 const TONE_EMOJI = { friendly: '\ud83d\udc9c', urgent: '\u26a1', funny: '\ud83d\ude06', aggressive: '\ud83d\udd25' };
-const TONE_LABEL = { friendly: 'teplo', urgent: 'srochno', funny: 'smeshno', aggressive: 'zhyostko' };
+function toneLabel(tone) { return t('tone.' + (tone || 'friendly')); }
 
 // ============================================================================
 // Utilities
@@ -106,7 +114,7 @@ function setBanner(text, variant) {
 }
 
 function formatWhen(ts) {
-  return new Date(ts).toLocaleString('ru-RU', {
+  return new Date(ts).toLocaleString(localeFor(getLang()), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -122,11 +130,11 @@ function relativeLabel(ts) {
   const hr = Math.round(abs / 3600000);
   const day = Math.round(abs / 86400000);
   let label;
-  if (min < 1) label = 'pryamo seychas';
-  else if (min < 60) label = min + ' min';
-  else if (hr < 24) label = hr + ' ch';
-  else label = day + ' dn.';
-  return diff < 0 ? 'prosrocheno \u00b7 ' + label + ' nazad' : 'cherez ' + label;
+  if (min < 1) return diff < 0 ? t('rel.overdue', { label: t('rel.now') }) : t('rel.now');
+  else if (min < 60) label = t('rel.min', { n: min });
+  else if (hr < 24) label = t('rel.hour', { n: hr });
+  else label = t('rel.day', { n: day });
+  return diff < 0 ? t('rel.overdue', { label }) : t('rel.in', { label });
 }
 
 function relativeClass(ts) {
@@ -202,6 +210,22 @@ async function initConfig() {
   state.vapidPublicKey = await config.get('vapidPublicKey', '');
   state.sessionToken = await config.get('sessionToken', '');
   state.user = await config.get('user', null);
+
+  const savedLang = await config.get('lang', null);
+  const initialLang = savedLang || (state.user && state.user.lang) || detectBrowserLang();
+  setLang(initialLang);
+  if (!savedLang) { try { await config.set('lang', initialLang); } catch {} }
+  applyTranslations();
+  onLangChange(() => { applyTranslations(); render(); });
+}
+
+async function changeLang(lang, opts = {}) {
+  if (!SUPPORTED_LANGS.includes(lang)) return;
+  setLang(lang);
+  try { await config.set('lang', lang); } catch {}
+  if (!opts.skipServer && state.workerUrl && state.sessionToken) {
+    try { await api('/api/user/lang', { method: 'POST', body: { lang } }); } catch {}
+  }
 }
 
 // ============================================================================
@@ -348,13 +372,13 @@ async function clearSession() {
 }
 
 async function registerNewAccount(displayName) {
-  if (!state.workerUrl) throw new Error('Worker ne nastroen');
-  if (!isPasskeySupported()) throw new Error('Passkey ne podderzhivaetsya v etom brauzere');
+  if (!state.workerUrl) throw new Error(t('err.worker_not_configured'));
+  if (!isPasskeySupported()) throw new Error(t('err.passkey_unsupported'));
 
   const beginRes = await fetch(state.workerUrl + '/api/auth/register/begin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ displayName: displayName || 'Me' }),
+    body: JSON.stringify({ displayName: displayName || 'Me', lang: getLang() }),
   });
   if (!beginRes.ok) {
     const j = await beginRes.json().catch(() => ({}));
@@ -364,7 +388,7 @@ async function registerNewAccount(displayName) {
 
   const publicKey = prepRegisterOptions(options);
   const cred = await navigator.credentials.create({ publicKey });
-  if (!cred) throw new Error('Passkey otmenyon');
+  if (!cred) throw new Error(t('err.passkey_cancelled'));
 
   const finishRes = await fetch(state.workerUrl + '/api/auth/register/finish', {
     method: 'POST',
@@ -373,6 +397,7 @@ async function registerNewAccount(displayName) {
       challengeId,
       attestationResponse: serializeRegisterCredential(cred),
       deviceId: state.deviceId,
+      lang: getLang(),
     }),
   });
   if (!finishRes.ok) {
@@ -385,8 +410,8 @@ async function registerNewAccount(displayName) {
 }
 
 async function loginPasskey() {
-  if (!state.workerUrl) throw new Error('Worker ne nastroen');
-  if (!isPasskeySupported()) throw new Error('Passkey ne podderzhivaetsya v etom brauzere');
+  if (!state.workerUrl) throw new Error(t('err.worker_not_configured'));
+  if (!isPasskeySupported()) throw new Error(t('err.passkey_unsupported'));
 
   const beginRes = await fetch(state.workerUrl + '/api/auth/login/begin', {
     method: 'POST',
@@ -401,7 +426,7 @@ async function loginPasskey() {
 
   const publicKey = prepGetOptions(options);
   const cred = await navigator.credentials.get({ publicKey });
-  if (!cred) throw new Error('Passkey otmenyon');
+  if (!cred) throw new Error(t('err.passkey_cancelled'));
 
   const finishRes = await fetch(state.workerUrl + '/api/auth/login/finish', {
     method: 'POST',
@@ -422,13 +447,13 @@ async function loginPasskey() {
 }
 
 async function addPasskeyToAccount() {
-  if (!state.sessionToken) throw new Error('Ne avtorizovan');
+  if (!state.sessionToken) throw new Error(t('err.unauthorized'));
   const beginRes = await api('/api/auth/passkey/add/begin', { method: 'POST', body: {} });
   const { options, challengeId } = beginRes;
 
   const publicKey = prepRegisterOptions(options);
   const cred = await navigator.credentials.create({ publicKey });
-  if (!cred) throw new Error('Passkey otmenyon');
+  if (!cred) throw new Error(t('err.passkey_cancelled'));
 
   await api('/api/auth/passkey/add/finish', {
     method: 'POST',
@@ -476,7 +501,7 @@ function renderAuthScreen() {
   if (!state.workerUrl) {
     if (workerRow) workerRow.hidden = false;
     if (actions) actions.hidden = true;
-    setAuthStatus('Snachala nastroy Worker URL', 'pending');
+    setAuthStatus(t('auth.need_worker'), 'pending');
   } else {
     if (workerRow) workerRow.hidden = true;
     if (actions) actions.hidden = false;
@@ -501,18 +526,18 @@ function setupAuthScreen() {
     saveWorkerBtn.addEventListener('click', async () => {
       const url = (workerInput.value || '').trim().replace(/\/+$/, '');
       if (!url || !/^https?:\/\//i.test(url)) {
-        setAuthStatus('Vvedi validnyy URL (https://...)', 'error');
+        setAuthStatus(t('auth.bad_url'), 'error');
         return;
       }
-      setAuthStatus('Proverka...', 'pending');
+      setAuthStatus(t('auth.checking'), 'pending');
       try {
         await apiHealth(url);
         state.workerUrl = url;
         await config.set('workerUrl', url);
-        setAuthStatus('Worker OK — vkhodi cherez passkey', 'success');
+        setAuthStatus(t('auth.worker_ok'), 'success');
         renderAuthScreen();
       } catch (err) {
-        setAuthStatus('Worker ne otvechaet: ' + (err?.message || err), 'error');
+        setAuthStatus(t('auth.worker_err', { err: err?.message || err }), 'error');
       }
     });
   }
@@ -520,10 +545,10 @@ function setupAuthScreen() {
   if (loginBtn) {
     loginBtn.addEventListener('click', async () => {
       setAuthActionsDisabled(true);
-      setAuthStatus('Proveryayu passkey...', 'pending');
+      setAuthStatus(t('auth.checking_passkey'), 'pending');
       try {
         const data = await loginPasskey();
-        setAuthStatus('Dobro pozhalovat', 'success');
+        setAuthStatus(t('auth.welcome'), 'success');
         await afterLoginSuccess(data.user);
       } catch (err) {
         console.warn('login error', err);
@@ -539,10 +564,10 @@ function setupAuthScreen() {
       e.preventDefault();
       const name = (displayNameEl?.value || '').trim() || 'Me';
       setAuthActionsDisabled(true);
-      setAuthStatus('Sozdayu passkey...', 'pending');
+      setAuthStatus(t('auth.creating'), 'pending');
       try {
         const data = await registerNewAccount(name);
-        setAuthStatus('Akkaunt sozdan', 'success');
+        setAuthStatus(t('auth.created'), 'success');
         await afterLoginSuccess(data.user);
       } catch (err) {
         console.warn('register error', err);
@@ -552,11 +577,22 @@ function setupAuthScreen() {
       }
     });
   }
+
+  const authLangSel = document.getElementById('auth-lang');
+  if (authLangSel) {
+    authLangSel.value = getLang();
+    authLangSel.addEventListener('change', async () => {
+      await changeLang(authLangSel.value);
+    });
+  }
 }
 
 async function afterLoginSuccess(user) {
   hideAuthScreen();
-  toast('Privet, ' + (user?.displayName || 'Me') + '!', 'success');
+  if (user?.lang && SUPPORTED_LANGS.includes(user.lang) && user.lang !== getLang()) {
+    await changeLang(user.lang, { skipServer: true });
+  }
+  toast(t('acc.hello', { name: user?.displayName || 'friend' }), 'success');
 
   if (Notification.permission === 'granted') {
     await ensurePushSubscription();
@@ -574,8 +610,8 @@ function renderAccountSection() {
   box.hidden = false;
   const nameEl = document.getElementById('settings-user-name');
   const subEl = document.getElementById('settings-user-sub');
-  if (nameEl) nameEl.textContent = state.user.displayName || 'Me';
-  if (subEl) subEl.textContent = 'ID: ' + (state.user.id || '').slice(0, 12) + '...';
+  if (nameEl) nameEl.textContent = state.user.displayName || 'User';
+  if (subEl) subEl.textContent = 'ID: ' + (state.user.id || '').slice(0, 12) + '…';
 }
 
 // ============================================================================
@@ -629,24 +665,23 @@ function renderTgLinksList(links) {
     const meta = document.createElement('div');
     meta.className = 'tg-meta';
     const name = document.createElement('strong');
-    name.textContent = l.first_name || (l.username ? '@' + l.username : 'Chat #' + l.chat_id);
+    name.textContent = l.first_name || (l.username ? '@' + l.username : 'chat #' + l.chat_id);
     const since = document.createElement('small');
-    since.textContent = 'privyazan ' + new Date(l.linked_at).toLocaleDateString();
+    since.textContent = t('tg.linked_since', { date: new Date(l.linked_at).toLocaleDateString(localeFor(getLang())) });
     meta.appendChild(name);
     meta.appendChild(since);
     li.appendChild(meta);
 
     const btn = document.createElement('button');
     btn.className = 'tg-unlink-btn';
-    btn.textContent = 'Otvyazat’';
+    btn.textContent = t('tg.unlink');
     btn.addEventListener('click', async () => {
-      if (!confirm('Otvyazat' + '\u2019 etot Telegram-chat?')) return;
       try {
         await api('/api/telegram/links/' + l.chat_id, { method: 'DELETE' });
-        toast('Otvyazan', 'success');
+        toast(t('tg.toast_unlinked'), 'success');
         await renderTelegramSection();
       } catch (err) {
-        toast('Oshibka: ' + (err?.message || err), 'error');
+        toast(t('err.generic', { err: err?.message || err }), 'error');
       }
     });
     li.appendChild(btn);
@@ -675,7 +710,7 @@ async function startTelegramLink() {
     if (linked) linked.hidden = true;
     if (codeBlock) codeBlock.hidden = false;
   } catch (err) {
-    toast('Oshibka: ' + (err?.message || err), 'error');
+    toast(t('err.generic', { err: err?.message || err }), 'error');
   }
 }
 
@@ -685,13 +720,13 @@ async function checkTelegramLinked() {
     const links = resp?.links || [];
     if (links.length) {
       tgLinkCurrentCode = null;
-      toast('Telegram privyazan \u2713', 'success');
+      toast(t('tg.toast_linked'), 'success');
       await renderTelegramSection();
     } else {
-      toast('Poka net — ubedis\u2019 chto otpravil /link v boten', 'error');
+      toast(t('tg.toast_not_yet'), 'error');
     }
   } catch (err) {
-    toast('Oshibka: ' + (err?.message || err), 'error');
+    toast(t('err.generic', { err: err?.message || err }), 'error');
   }
 }
 
@@ -794,15 +829,15 @@ async function ensurePushSubscription() {
 function updatePushStatusPill() {
   if (!pushStatusPill) return;
   if (!state.workerUrl) {
-    pushStatusPill.textContent = 'Offline rezhim';
+    pushStatusPill.textContent = t('status.offline');
     pushStatusPill.className = 'pill pill-muted';
     return;
   }
   if (state.pushSubscribed) {
-    pushStatusPill.textContent = '\u25cf Push aktiven';
+    pushStatusPill.textContent = t('status.active');
     pushStatusPill.className = 'pill pill-success';
   } else {
-    pushStatusPill.textContent = '\u25cf Push ne nastroyen';
+    pushStatusPill.textContent = t('status.not_configured');
     pushStatusPill.className = 'pill pill-warning';
   }
 }
@@ -1017,13 +1052,13 @@ function renderItem(r, isPast = false) {
 
   const repeatEl = node.querySelector('.reminder-repeat');
   if (r.repeat && r.repeat !== 'none') {
-    repeatEl.textContent = REPEAT_LABEL[r.repeat];
+    repeatEl.textContent = repeatLabel(r.repeat);
     repeatEl.hidden = false;
   }
 
   const toneEl = node.querySelector('.reminder-tone');
   if (toneEl && r.tone) {
-    toneEl.textContent = TONE_EMOJI[r.tone] + ' ' + TONE_LABEL[r.tone];
+    toneEl.textContent = TONE_EMOJI[r.tone] + ' ' + toneLabel(r.tone);
     toneEl.hidden = false;
   }
 
@@ -1038,6 +1073,7 @@ function renderItem(r, isPast = false) {
     if (snoozeBtn) snoozeBtn.hidden = true;
   }
 
+  applyTranslations(node);
   node.querySelector('[data-action="delete"]').addEventListener('click', () => deleteReminder(r.id));
   const snoozeBtn = node.querySelector('[data-action="snooze"]');
   if (snoozeBtn) snoozeBtn.addEventListener('click', () => snoozeReminder(r.id, 10));
@@ -1056,11 +1092,11 @@ async function addReminder(e) {
 
   const fireAt = new Date(whenStr).getTime();
   if (isNaN(fireAt)) {
-    toast('Nekorrektnaya data', 'error');
+    toast(t('toast.bad_date'), 'error');
     return;
   }
   if (fireAt <= Date.now() - 60000 && repeat === 'none') {
-    toast('Vremya uzhe proshlo', 'error');
+    toast(t('toast.time_passed'), 'error');
     return;
   }
 
@@ -1083,8 +1119,24 @@ async function addReminder(e) {
   form.reset();
   if (toneEl) toneEl.value = tone;
   setMinDateTime();
-  titleEl.focus();
-  toast('Reminder dobavlen', 'success');
+  closeComposer();
+  toast(t('toast.created'), 'success');
+}
+
+const composerDialog = document.getElementById('composer-dialog');
+
+function openComposer() {
+  if (!composerDialog) return;
+  setMinDateTime();
+  if (composerDialog.showModal) composerDialog.showModal();
+  else composerDialog.hidden = false;
+  setTimeout(() => titleEl?.focus(), 50);
+}
+
+function closeComposer() {
+  if (!composerDialog) return;
+  if (composerDialog.close && composerDialog.open) composerDialog.close();
+  else composerDialog.hidden = true;
 }
 
 async function deleteReminder(id) {
@@ -1093,7 +1145,7 @@ async function deleteReminder(id) {
   await cancelLocalNotification(id);
   syncDeleteReminderToBackend(id);
   render();
-  toast('Udaleno');
+  toast(t('toast.deleted'));
 }
 
 async function snoozeReminder(id, minutes) {
@@ -1105,7 +1157,7 @@ async function snoozeReminder(id, minutes) {
   await scheduleLocalNotification(r);
   syncAckToBackend(id, 'snooze', minutes);
   render();
-  toast('Otlozheno na ' + minutes + ' min');
+  toast(t('toast.snoozed', { n: minutes }));
 }
 
 // ============================================================================
@@ -1120,7 +1172,7 @@ async function scheduleLocalNotification(r) {
     await cancelLocalNotification(r.id);
     const fireAt = nextFireAt(r);
     await reg.showNotification(r.title, {
-      body: r.note || 'Vremya!',
+      body: r.note || t('test.default_body'),
       tag: 'push-az-local-' + r.id,
       icon: '/icons/icon.svg',
       badge: '/icons/icon.svg',
@@ -1188,7 +1240,7 @@ function showTakeover(r, totalCount) {
   takeoverTitle.textContent = r.title;
   takeoverNote.textContent = r.note || '';
   takeoverNote.hidden = !r.note;
-  takeoverCounter.textContent = totalCount > 1 ? '+' + (totalCount - 1) + ' eshchyo' : '';
+  takeoverCounter.textContent = totalCount > 1 ? t('takeover.more', { n: totalCount - 1 }) : '';
   takeoverCounter.hidden = totalCount <= 1;
   takeoverEl.dataset.reminderId = r.id;
   takeoverEl.hidden = false;
@@ -1224,14 +1276,9 @@ function renderChallenge(wrongAttempt) {
   const ch = generateChallenge();
   takeoverEl.dataset.correctDigit = String(ch.correct);
 
-  const promptPhrases = [
-    (n) => `Nazhmi <strong>${n}</strong> chtoby zakryt\u2019`,
-    (n) => `Chtoby podtverdit\u2019 \u2014 tap na <strong>${n}</strong>`,
-    (n) => `Prochel? Nazhmi <strong>${n}</strong>`,
-    (n) => `Tsifra <strong>${n}</strong> \u2014 i svoboden`,
-  ];
-  const phrase = promptPhrases[Math.floor(Math.random() * promptPhrases.length)](ch.correct);
-  takeoverChallengePrompt.innerHTML = phrase;
+  const promptKeys = ['takeover.challenge.1', 'takeover.challenge.2', 'takeover.challenge.3', 'takeover.challenge.4'];
+  const key = promptKeys[Math.floor(Math.random() * promptKeys.length)];
+  takeoverChallengePrompt.innerHTML = t(key, { n: ch.correct });
 
   takeoverChallengeButtons.innerHTML = '';
   ch.buttons.forEach((d) => {
@@ -1245,7 +1292,7 @@ function renderChallenge(wrongAttempt) {
   });
 
   if (wrongAttempt) {
-    takeoverChallengeHint.textContent = 'Ne tak. Prochti vnimatel\u2019no.';
+    takeoverChallengeHint.textContent = t('takeover.wrong');
     takeoverChallengeHint.hidden = false;
   } else {
     takeoverChallengeHint.hidden = true;
@@ -1278,7 +1325,7 @@ async function takeoverConfirmDone() {
     state.reminders = state.reminders.filter((x) => x.id !== id);
     await cancelLocalNotification(id);
     render();
-    toast('Vypolneno \u2713', 'success');
+    toast(t('toast.done'), 'success');
   }
   hideTakeover();
 }
@@ -1298,6 +1345,8 @@ async function openSettings() {
   settingsWorkerUrl.value = state.workerUrl || '';
   settingsStatus.textContent = '';
   settingsStatus.className = '';
+  const langSel = document.getElementById('settings-lang');
+  if (langSel) langSel.value = getLang();
   renderAccountSection();
   renderTelegramSection();
   if (settingsDialog.showModal) settingsDialog.showModal();
@@ -1312,7 +1361,11 @@ function closeSettings() {
 async function saveSettings(e) {
   e.preventDefault();
   const url = settingsWorkerUrl.value.trim().replace(/\/+$/, '');
-  settingsStatus.textContent = 'Proveryayu...';
+  const langSel = document.getElementById('settings-lang');
+  if (langSel && langSel.value && langSel.value !== getLang()) {
+    await changeLang(langSel.value);
+  }
+  settingsStatus.textContent = t('settings.status.checking');
   settingsStatus.className = '';
 
   if (!url) {
@@ -1324,12 +1377,12 @@ async function saveSettings(e) {
     updatePushStatusPill();
     updatePermissionUI();
     closeSettings();
-    toast('Worker URL ochishchen, rezhim offline');
+    toast(t('toast.worker_cleared'));
     return;
   }
 
   if (!/^https?:\/\//.test(url)) {
-    settingsStatus.textContent = 'URL dolzhen nachinat\u2019sya s http:// ili https://';
+    settingsStatus.textContent = t('settings.status.bad_url');
     settingsStatus.className = 'error';
     return;
   }
@@ -1337,14 +1390,14 @@ async function saveSettings(e) {
   try {
     await apiHealth(url);
   } catch (err) {
-    settingsStatus.textContent = 'Ne udalos\u2019 podklyuchit\u2019sya: ' + err.message;
+    settingsStatus.textContent = t('settings.status.fail', { err: err.message });
     settingsStatus.className = 'error';
     return;
   }
 
   state.workerUrl = url;
   await config.set('workerUrl', url);
-  settingsStatus.textContent = 'Podklyucheno \u2713';
+  settingsStatus.textContent = t('settings.status.ok');
   settingsStatus.className = 'success';
 
   if (Notification.permission === 'granted') {
@@ -1354,12 +1407,12 @@ async function saveSettings(e) {
   updatePushStatusPill();
   updatePermissionUI();
   setTimeout(closeSettings, 600);
-  toast('Nastroyki sokhraneny', 'success');
+  toast(t('toast.settings_saved'), 'success');
 }
 
 async function updatePermissionUI() {
   if (!('Notification' in window)) {
-    setBanner('Tvoy brauzer ne podderzhivayet uvedomleniya.', 'warning');
+    setBanner(t('banner.no_notification_api'), 'warning');
     permissionBtn.hidden = true;
     return;
   }
@@ -1367,18 +1420,18 @@ async function updatePermissionUI() {
   if (perm === 'granted') {
     permissionBtn.hidden = true;
     if (state.workerUrl && !state.pushSubscribed) {
-      setBanner('Uvedomleniya razresheny. Podklyuchayu push...', 'warning');
+      setBanner(t('banner.connecting_push'), 'warning');
     } else if (!state.workerUrl) {
-      setBanner('Dlya nadyozhnykh uvedomleniy nastroy Worker URL v nastroykakh \u2699\ufe0f', 'warning');
+      setBanner(t('banner.configure_worker'), 'warning');
     } else {
       setBanner('', '');
     }
   } else if (perm === 'denied') {
     permissionBtn.hidden = true;
-    setBanner('Uvedomleniya zablokirovany. Razreshi ikh v nastroykakh sayta.', 'error');
+    setBanner(t('banner.notifications_blocked'), 'error');
   } else {
     permissionBtn.hidden = false;
-    setBanner('Dlya raboty nuzhno razreshit\u2019 uvedomleniya.', 'warning');
+    setBanner(t('banner.need_permission'), 'warning');
   }
 }
 
@@ -1387,7 +1440,7 @@ async function requestPermission() {
   try {
     const res = await Notification.requestPermission();
     if (res === 'granted') {
-      toast('Uvedomleniya vklyucheny', 'success');
+      toast(t('toast.notifications_on'), 'success');
       await ensurePushSubscription();
       for (const r of state.reminders) await scheduleLocalNotification(r);
     }
@@ -1407,7 +1460,7 @@ async function sendTestNotification(e) {
   if (state.workerUrl && state.pushSubscribed) {
     try {
       await api('/api/test-push', { method: 'POST', body: {} });
-      toast('Test-push otpravlen s backend', 'success');
+      toast(t('toast.test_push_sent'), 'success');
       return;
     } catch (err) {
       console.warn('Backend test push failed, falling back to local:', err);
@@ -1415,13 +1468,13 @@ async function sendTestNotification(e) {
   }
 
   const reg = await navigator.serviceWorker.ready;
-  await reg.showNotification('push.az', {
-    body: 'Test-uvedomleniye. Vsyo rabotayet!',
+  await reg.showNotification(t('test.notification_title'), {
+    body: t('test.body'),
     icon: '/icons/icon.svg',
     badge: '/icons/icon.svg',
     tag: 'push-az-test',
   });
-  toast('Lokal\u2019noye test-uvedomleniye otpravleno');
+  toast(t('toast.local_test_sent'));
 }
 
 // ============================================================================
@@ -1481,7 +1534,7 @@ function setupSWMessageHandler() {
 }
 
 function showTakeoverForTest() {
-  const fake = { id: 'test', title: 'Test challenge', note: 'Nazhmi pravil\u2019nuyu tsifru chtoby zakryt\u2019.' };
+  const fake = { id: 'test', title: t('takeover.test_title'), note: t('takeover.test_note') };
   state.takeoverActive = true;
   takeoverTitle.textContent = fake.title;
   takeoverNote.textContent = fake.note;
@@ -1500,7 +1553,7 @@ function showTakeoverForTest() {
 function handleURLAction() {
   const params = new URLSearchParams(location.search);
   if (params.get('action') === 'new') {
-    titleEl.focus();
+    openComposer();
     history.replaceState({}, '', location.pathname);
   }
   if (params.get('action') === 'ack') {
@@ -1546,66 +1599,27 @@ function detectPlatform() {
 
 function getInstallInstructions() {
   const p = detectPlatform();
+  function steps(prefix, count) {
+    const arr = [];
+    for (let i = 1; i <= count; i++) arr.push(t(prefix + '.' + i));
+    return arr;
+  }
   if (p.isIOS && !p.isMac) {
-    return {
-      title: 'iPhone / iPad — Safari',
-      steps: [
-        'Vnizu (ili sprava sverkhu) nazhmi <kbd>Share</kbd> \u2014 kvadratik so strelkoy vverkh.',
-        'V menyu prolistay i vyberi <kbd>Add to Home Screen</kbd>.',
-        'Nazhmi <kbd>Add</kbd>.',
-        'Otkroy push.az s home screen (ne iz Safari).',
-      ],
-    };
+    return { title: t('install.iphone.title'), steps: steps('install.iphone', 4) };
   }
   if (p.isMac && p.isSafari) {
-    return {
-      title: 'Mac \u2014 Safari (macOS 14+)',
-      steps: [
-        'V menyu sverkhu: <kbd>File</kbd> \u2192 <kbd>Add to Dock...</kbd>',
-        'Nazhmi <kbd>Add</kbd>.',
-        'Otkroy push.az iz Dock.',
-        'V System Settings \u2192 Notifications poyavitsya push.az.',
-      ],
-    };
+    return { title: t('install.mac_safari.title'), steps: steps('install.mac_safari', 4) };
   }
   if (p.isMac && p.isChromium) {
-    return {
-      title: 'Mac \u2014 Chrome / Brave / Edge / Arc',
-      steps: [
-        'V adresnoy stroke sprava nazhmi ikonku <kbd>Install</kbd> (monitor so strelkoy vniz).',
-        'Ili \u2014 menyu <kbd>\u2026</kbd> \u2192 <kbd>Install push.az</kbd>.',
-        'Nazhmi <kbd>Install</kbd>.',
-        'Otkroy push.az iz Launchpad / Applications.',
-      ],
-    };
+    return { title: t('install.mac_chrome.title'), steps: steps('install.mac_chrome', 4) };
   }
   if (p.isAndroid && p.isChromium) {
-    return {
-      title: 'Android \u2014 Chrome',
-      steps: [
-        'Menyu <kbd>\u22ee</kbd> sverkhu sprava.',
-        'Vyberi <kbd>Install app</kbd> ili <kbd>Add to Home screen</kbd>.',
-        'Podtverdi.',
-      ],
-    };
+    return { title: t('install.android.title'), steps: steps('install.android', 3) };
   }
   if (p.isFirefox) {
-    return {
-      title: 'Firefox',
-      steps: [
-        'Firefox pokhka ne podderzhivaet PWA na desktop polnost\u2019yu.',
-        'Ispol\u2019zuy Chrome, Brave, Edge ili Safari dlya ustanovki.',
-      ],
-    };
+    return { title: t('install.firefox.title'), steps: steps('install.firefox', 2) };
   }
-  return {
-    title: 'Ustanovka',
-    steps: [
-      'V tvoyem brauzere poyavitsya ikonka "Install" v adresnoy stroke libo v menyu.',
-      'Nazhmi yeyo, potom <kbd>Install</kbd>.',
-      'Otkroy push.az kak otdel\u2019noye prilozheniye.',
-    ],
-  };
+  return { title: t('install.other.title'), steps: steps('install.other', 3) };
 }
 
 function renderInstallInstructions() {
@@ -1646,7 +1660,7 @@ function setupInstallBanner() {
       try {
         const { outcome } = await deferredInstall.userChoice;
         if (outcome === 'accepted') {
-          toast('Ustanovleno \u2713', 'success');
+          toast(t('install.ok_toast'), 'success');
           localStorage.setItem(INSTALL_DISMISS_KEY, '1');
           updateInstallBannerVisibility();
         }
@@ -1682,7 +1696,7 @@ window.addEventListener('appinstalled', () => {
   deferredInstall = null;
   localStorage.setItem(INSTALL_DISMISS_KEY, '1');
   updateInstallBannerVisibility();
-  toast('push.az ustanovlen \u2713', 'success');
+  toast(t('install.done_toast'), 'success');
 });
 
 // Otslezhivaem transition standalone mode
@@ -1704,13 +1718,19 @@ async function registerSW() {
 
 function bindEvents() {
   form.addEventListener('submit', addReminder);
-  resetBtn.addEventListener('click', () => { form.reset(); setMinDateTime(); });
+  if (resetBtn) resetBtn.addEventListener('click', () => { form.reset(); setMinDateTime(); closeComposer(); });
   permissionBtn.addEventListener('click', requestPermission);
   testLink.addEventListener('click', sendTestNotification);
   if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
   if (settingsForm) settingsForm.addEventListener('submit', saveSettings);
   document.querySelectorAll('[data-close-settings]').forEach((b) =>
     b.addEventListener('click', closeSettings),
+  );
+
+  const openComposerBtn = document.getElementById('open-composer-btn');
+  if (openComposerBtn) openComposerBtn.addEventListener('click', openComposer);
+  document.querySelectorAll('[data-close-composer]').forEach((b) =>
+    b.addEventListener('click', closeComposer),
   );
 
   if (takeoverSnooze) takeoverSnooze.addEventListener('click', takeoverSnoozeAction);
@@ -1722,14 +1742,14 @@ function bindEvents() {
   if (testBadgeBtn) {
     testBadgeBtn.addEventListener('click', async () => {
       if (!('setAppBadge' in navigator)) {
-        toast('Badge API ne podderzhivaetsya na etom ustroystve', 'error');
+        toast(t('toast.badge_unsupported'), 'error');
         return;
       }
       try {
         await navigator.setAppBadge(3);
-        toast('Badge = 3 \u2014 posmotri na ikonku na home screen', 'success');
+        toast(t('toast.badge_set'), 'success');
       } catch (err) {
-        toast('Ne udalos\u2019: ' + (err?.message || err), 'error');
+        toast(t('toast.failed', { err: err?.message || err }), 'error');
       }
     });
   }
@@ -1738,7 +1758,7 @@ function bindEvents() {
     clearBadgeBtn.addEventListener('click', async () => {
       try {
         if (navigator.clearAppBadge) await navigator.clearAppBadge();
-        toast('Badge sbroshen', 'success');
+        toast(t('toast.badge_cleared'), 'success');
       } catch {}
     });
   }
@@ -1756,26 +1776,26 @@ function bindEvents() {
     clearMissedBtn.addEventListener('click', async () => {
       console.log('[clear-missed] click', { url: state.workerUrl, hasToken: !!state.sessionToken });
       if (!state.workerUrl || !state.sessionToken) {
-        toast('Ne avtorizovan', 'error');
+        toast(t('err.unauthorized'), 'error');
         return;
       }
       clearMissedBtn.disabled = true;
-      clearMissedBtn.textContent = 'Ochishchayu\u2026';
+      const origText = clearMissedBtn.textContent;
+      clearMissedBtn.textContent = '…';
       try {
         const res = await api('/api/reminders/clear-missed', { method: 'POST', body: {} });
         console.log('[clear-missed] response', res);
         const n = Number(res?.changes || 0);
-        toast(n > 0 ? 'Ochishcheno: ' + n : 'Propushchennykh ne bylo', 'success');
-        // Zakryt' settings chtoby toast bylo vidno
+        toast(n > 0 ? t('toast.cleared_missed', { n }) : t('toast.no_missed'), 'success');
         closeSettings();
         hideTakeover();
         await syncAllReminders();
       } catch (err) {
         console.error('[clear-missed] error', err);
-        toast('Oshibka: ' + (err?.message || err), 'error');
+        toast(t('err.generic', { err: err?.message || err }), 'error');
       } finally {
         clearMissedBtn.disabled = false;
-        clearMissedBtn.textContent = 'Ochistit\u2019 propushchennye';
+        clearMissedBtn.textContent = origText;
       }
     });
   }
@@ -1789,24 +1809,24 @@ function bindEvents() {
     addPasskeyBtn.addEventListener('click', async () => {
       try {
         await addPasskeyToAccount();
-        toast('Passkey dobavlen \u2713', 'success');
+        toast(t('acc.passkey_added'), 'success');
       } catch (err) {
-        toast('Oshibka: ' + (err?.message || err), 'error');
+        toast(t('err.generic', { err: err?.message || err }), 'error');
       }
     });
   }
 
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      if (!confirm('Vyyti iz akkaunta? Lokal\u2019nye reminder\u2019y budut ochishcheny na etom ustroystve (oni sokhranyatsya na servere).')) return;
+      if (!confirm(t('acc.logout_confirm'))) return;
       try {
         if (settingsDialog?.close) settingsDialog.close();
         else if (settingsDialog) settingsDialog.hidden = true;
         await logoutCurrentUser();
         renderAuthScreen();
-        toast('Vyshli iz akkaunta', 'success');
+        toast(t('acc.logout_toast'), 'success');
       } catch (err) {
-        toast('Oshibka: ' + (err?.message || err), 'error');
+        toast(t('err.generic', { err: err?.message || err }), 'error');
       }
     });
   }
