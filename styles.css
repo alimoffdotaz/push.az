@@ -1062,6 +1062,8 @@ a:hover {
   overflow-y: auto;
 }
 
+.auth-screen[hidden] { display: none !important; }
+
 .auth-card {
   width: 100%;
   max-width: 460px;
