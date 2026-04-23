@@ -12,6 +12,13 @@ import {
   handleRemovePasskey,
   getUserFromRequest,
 } from './auth.js';
+import {
+  handleTelegramWebhook,
+  createLinkCode,
+  tgSendReminderToUser,
+  setTelegramWebhook,
+  getTelegramWebhookInfo,
+} from './telegram.js';
 
 // ============================================================================
 // Glavnyy Worker entry point
@@ -129,6 +136,30 @@ async function handleRequest(request, env, ctx) {
     return authRoute((r, e) => handleRemovePasskey(r, e, rmPasskeyMatch[1]), request, env);
   }
 
+  // ---- Telegram webhook (publichniy, zashchishchyon po X-Telegram-Bot-Api-Secret-Token) ----
+  if (path === '/api/telegram/webhook' && method === 'POST') {
+    return handleTelegramWebhook(request, env);
+  }
+
+  // ---- Telegram admin (tol'ko dlya setup) ----
+  if (path === '/api/telegram/admin/set-webhook' && method === 'POST') {
+    if (!env.ADMIN_TOKEN || request.headers.get('X-Admin-Token') !== env.ADMIN_TOKEN) {
+      return jsonResponse({ error: 'forbidden' }, 403, request, env);
+    }
+    let body; try { body = await request.json(); } catch { body = {}; }
+    const webhookUrl = body.url || (new URL(request.url).origin + '/api/telegram/webhook');
+    const result = await setTelegramWebhook(env, webhookUrl);
+    return jsonResponse(result, 200, request, env);
+  }
+
+  if (path === '/api/telegram/admin/webhook-info' && method === 'GET') {
+    if (!env.ADMIN_TOKEN || request.headers.get('X-Admin-Token') !== env.ADMIN_TOKEN) {
+      return jsonResponse({ error: 'forbidden' }, 403, request, env);
+    }
+    const result = await getTelegramWebhookInfo(env);
+    return jsonResponse(result, 200, request, env);
+  }
+
   // ---- Zashchischennye endpointy: trebuyem session ----
   const user = await getUserFromRequest(env, request);
 
@@ -160,6 +191,21 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/test-push' && method === 'POST') {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
     return handleTestPush(request, env, ctx, user);
+  }
+
+  // Telegram (authenticated)
+  if (path === '/api/telegram/link/begin' && method === 'POST') {
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleTelegramLinkBegin(request, env, user);
+  }
+  if (path === '/api/telegram/status' && method === 'GET') {
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleTelegramStatus(request, env, user);
+  }
+  const tgUnlinkMatch = path.match(/^\/api\/telegram\/links\/(\d+)$/);
+  if (tgUnlinkMatch && method === 'DELETE') {
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleTelegramUnlink(request, env, user, tgUnlinkMatch[1]);
   }
 
   if (path === '/' || path === '/api') {
@@ -429,6 +475,11 @@ async function handleTestPush(request, env, ctx, user) {
   const built = await buildPushBody(env, testReminder, 2);
   const pendingCount = await countPendingRemindersForUser(env, user.userId);
 
+  // Telegram test send
+  if (env.TELEGRAM_BOT_TOKEN) {
+    try { await tgSendReminderToUser(env, user.userId, testReminder, built.text, 1, 1); } catch {}
+  }
+
   let ok = true;
   for (const d of list) {
     const result = await sendWebPush(
@@ -460,6 +511,49 @@ async function countPendingRemindersForUser(env, userId) {
   } catch {
     return 0;
   }
+}
+
+// ============================================================================
+// Telegram link-flow handlers
+// ============================================================================
+
+async function handleTelegramLinkBegin(request, env, user) {
+  const botUsername = env.TELEGRAM_BOT_USERNAME || 'push_az_bot';
+  if (!env.TELEGRAM_BOT_TOKEN) {
+    return jsonResponse({ error: 'telegram not configured' }, 500, request, env);
+  }
+  const { code, expiresAt } = await createLinkCode(env, user.userId);
+  const deepLink = `https://t.me/${botUsername}?start=${code}`;
+  return jsonResponse({
+    code,
+    expiresAt,
+    botUsername,
+    deepLink,
+    instructions: 'Otkroi deepLink ili napishi botu komandu: /link ' + code,
+  }, 200, request, env);
+}
+
+async function handleTelegramStatus(request, env, user) {
+  const rows = await env.DB.prepare(
+    `SELECT chat_id, username, first_name, linked_at
+     FROM telegram_links WHERE user_id = ?1 ORDER BY linked_at DESC`,
+  )
+    .bind(user.userId)
+    .all();
+  return jsonResponse({ links: rows.results || [] }, 200, request, env);
+}
+
+async function handleTelegramUnlink(request, env, user, chatIdStr) {
+  const chatId = Number(chatIdStr);
+  if (!Number.isFinite(chatId)) {
+    return jsonResponse({ error: 'invalid chat_id' }, 400, request, env);
+  }
+  await env.DB.prepare(
+    `DELETE FROM telegram_links WHERE chat_id = ?1 AND user_id = ?2`,
+  )
+    .bind(chatId, user.userId)
+    .run();
+  return jsonResponse({ ok: true }, 200, request, env);
 }
 
 async function countPendingRemindersForDevice(env, deviceId) {
@@ -549,6 +643,15 @@ async function processOneReminder(env, r, vapid, now) {
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone };
   const built = await buildPushBody(env, reminder, attempt);
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
+
+  // Parallelno shlyom v Telegram (esli user'a privyazal)
+  if (env.TELEGRAM_BOT_TOKEN) {
+    try {
+      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS);
+    } catch (err) {
+      console.warn('[tg] send failed for reminder', r.id, err?.message || err);
+    }
+  }
 
   let anyOk = false;
   let anyNonGoneError = false;

@@ -220,6 +220,43 @@
 
       <div id="settings-status" class="settings-status"></div>
 
+      <div class="settings-telegram" id="settings-telegram" hidden>
+        <h4>Telegram <span class="chip">dublirovaniye</span></h4>
+        <p class="muted settings-telegram-hint">
+          Privyazhi Telegram — reminder'y budut prikhodit' i v chat s botom.
+          Rabotayet dazhe yesli brauzer/iPhone nedostupen.
+        </p>
+        <div id="settings-tg-empty" class="settings-tg-empty">
+          <button type="button" class="btn btn-primary btn-small" id="tg-link-btn">
+            Privyazat’ Telegram
+          </button>
+        </div>
+        <div id="settings-tg-code" class="settings-tg-code" hidden>
+          <div class="settings-tg-code-label">Tvoy kod:</div>
+          <div class="settings-tg-code-value" id="tg-code-value">——————</div>
+          <a id="tg-deep-link" href="#" target="_blank" rel="noopener" class="btn btn-primary btn-small">
+            Otkryt’ bota v Telegram
+          </a>
+          <p class="muted small">
+            Ili vruchnuyu: otkroi Telegram, naydi bota
+            <strong id="tg-bot-username">@push_az_bot</strong>,
+            otprav' emu: <code id="tg-link-cmd">/link ——————</code>
+          </p>
+          <button type="button" class="btn btn-ghost btn-small" id="tg-check-btn">
+            Ya otpravil — proverit’
+          </button>
+          <button type="button" class="btn btn-ghost btn-small" id="tg-cancel-btn">
+            Otmenit’
+          </button>
+        </div>
+        <div id="settings-tg-linked" class="settings-tg-linked" hidden>
+          <ul id="tg-links-list" class="tg-links-list"></ul>
+          <button type="button" class="btn btn-ghost btn-small" id="tg-add-more-btn">
+            Privyazat’ eshche chat
+          </button>
+        </div>
+      </div>
+
       <div class="settings-account" id="settings-account" hidden>
         <h4>Akkaunt</h4>
         <div class="settings-account-info">

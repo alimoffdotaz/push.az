@@ -578,6 +578,140 @@ function renderAccountSection() {
   if (subEl) subEl.textContent = 'ID: ' + (state.user.id || '').slice(0, 12) + '...';
 }
 
+// ============================================================================
+// Telegram privyazka
+// ============================================================================
+
+let tgLinkCurrentCode = null;
+
+async function renderTelegramSection() {
+  const box = document.getElementById('settings-telegram');
+  if (!box) return;
+  if (!state.user || !state.workerUrl) { box.hidden = true; return; }
+  box.hidden = false;
+
+  const empty = document.getElementById('settings-tg-empty');
+  const codeBlock = document.getElementById('settings-tg-code');
+  const linked = document.getElementById('settings-tg-linked');
+
+  if (tgLinkCurrentCode) {
+    if (empty) empty.hidden = true;
+    if (linked) linked.hidden = true;
+    if (codeBlock) codeBlock.hidden = false;
+    return;
+  }
+
+  // Zapraw status
+  try {
+    const resp = await api('/api/telegram/status', { method: 'GET' });
+    const links = resp?.links || [];
+    if (links.length) {
+      if (empty) empty.hidden = true;
+      if (codeBlock) codeBlock.hidden = true;
+      if (linked) linked.hidden = false;
+      renderTgLinksList(links);
+    } else {
+      if (empty) empty.hidden = false;
+      if (codeBlock) codeBlock.hidden = true;
+      if (linked) linked.hidden = true;
+    }
+  } catch (err) {
+    if (empty) empty.hidden = false;
+  }
+}
+
+function renderTgLinksList(links) {
+  const ul = document.getElementById('tg-links-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+  for (const l of links) {
+    const li = document.createElement('li');
+    const meta = document.createElement('div');
+    meta.className = 'tg-meta';
+    const name = document.createElement('strong');
+    name.textContent = l.first_name || (l.username ? '@' + l.username : 'Chat #' + l.chat_id);
+    const since = document.createElement('small');
+    since.textContent = 'privyazan ' + new Date(l.linked_at).toLocaleDateString();
+    meta.appendChild(name);
+    meta.appendChild(since);
+    li.appendChild(meta);
+
+    const btn = document.createElement('button');
+    btn.className = 'tg-unlink-btn';
+    btn.textContent = 'Otvyazat’';
+    btn.addEventListener('click', async () => {
+      if (!confirm('Otvyazat' + '\u2019 etot Telegram-chat?')) return;
+      try {
+        await api('/api/telegram/links/' + l.chat_id, { method: 'DELETE' });
+        toast('Otvyazan', 'success');
+        await renderTelegramSection();
+      } catch (err) {
+        toast('Oshibka: ' + (err?.message || err), 'error');
+      }
+    });
+    li.appendChild(btn);
+    ul.appendChild(li);
+  }
+}
+
+async function startTelegramLink() {
+  try {
+    const resp = await api('/api/telegram/link/begin', { method: 'POST', body: {} });
+    tgLinkCurrentCode = resp.code;
+    const empty = document.getElementById('settings-tg-empty');
+    const linked = document.getElementById('settings-tg-linked');
+    const codeBlock = document.getElementById('settings-tg-code');
+    const codeValue = document.getElementById('tg-code-value');
+    const deepLink = document.getElementById('tg-deep-link');
+    const botName = document.getElementById('tg-bot-username');
+    const cmd = document.getElementById('tg-link-cmd');
+
+    if (codeValue) codeValue.textContent = resp.code;
+    if (deepLink) deepLink.href = resp.deepLink;
+    if (botName) botName.textContent = '@' + (resp.botUsername || 'push_az_bot');
+    if (cmd) cmd.textContent = '/link ' + resp.code;
+
+    if (empty) empty.hidden = true;
+    if (linked) linked.hidden = true;
+    if (codeBlock) codeBlock.hidden = false;
+  } catch (err) {
+    toast('Oshibka: ' + (err?.message || err), 'error');
+  }
+}
+
+async function checkTelegramLinked() {
+  try {
+    const resp = await api('/api/telegram/status', { method: 'GET' });
+    const links = resp?.links || [];
+    if (links.length) {
+      tgLinkCurrentCode = null;
+      toast('Telegram privyazan \u2713', 'success');
+      await renderTelegramSection();
+    } else {
+      toast('Poka net — ubedis\u2019 chto otpravil /link v boten', 'error');
+    }
+  } catch (err) {
+    toast('Oshibka: ' + (err?.message || err), 'error');
+  }
+}
+
+function cancelTelegramLink() {
+  tgLinkCurrentCode = null;
+  renderTelegramSection();
+}
+
+function setupTelegramButtons() {
+  const linkBtn = document.getElementById('tg-link-btn');
+  const addMoreBtn = document.getElementById('tg-add-more-btn');
+  const checkBtn = document.getElementById('tg-check-btn');
+  const cancelBtn = document.getElementById('tg-cancel-btn');
+
+  if (linkBtn) linkBtn.addEventListener('click', startTelegramLink);
+  if (addMoreBtn) addMoreBtn.addEventListener('click', startTelegramLink);
+  if (checkBtn) checkBtn.addEventListener('click', checkTelegramLinked);
+  if (cancelBtn) cancelBtn.addEventListener('click', cancelTelegramLink);
+}
+
 async function logoutCurrentUser() {
   try {
     if (state.sessionToken) await api('/api/auth/logout', { method: 'POST', body: {} });
@@ -1120,6 +1254,7 @@ async function openSettings() {
   settingsStatus.textContent = '';
   settingsStatus.className = '';
   renderAccountSection();
+  renderTelegramSection();
   if (settingsDialog.showModal) settingsDialog.showModal();
   else settingsDialog.hidden = false;
 }
@@ -1570,6 +1705,8 @@ function bindEvents() {
       setTimeout(() => showTakeoverForTest(), 300);
     });
   }
+
+  setupTelegramButtons();
 
   const addPasskeyBtn = document.getElementById('add-passkey-btn');
   const logoutBtn = document.getElementById('logout-btn');

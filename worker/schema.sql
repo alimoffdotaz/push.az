@@ -89,6 +89,29 @@ CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(user_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_device ON reminders(device_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_schedule ON reminders(status, next_attempt_at, fire_at);
 
+-- Telegram privyazka (chat_id -> user_id)
+CREATE TABLE IF NOT EXISTS telegram_links (
+  chat_id     INTEGER PRIMARY KEY,
+  user_id     TEXT    NOT NULL,
+  username    TEXT,
+  first_name  TEXT,
+  linked_at   INTEGER NOT NULL,
+  last_msg_at INTEGER,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_tg_user ON telegram_links(user_id);
+
+-- Vremennye kody dlya privyazki Telegrama (6-znachnyy code)
+CREATE TABLE IF NOT EXISTS telegram_link_codes (
+  code        TEXT    PRIMARY KEY,
+  user_id     TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  consumed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_tg_codes_user ON telegram_link_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_tg_codes_expires ON telegram_link_codes(expires_at);
+
 -- Log otpravlennykh pushey
 CREATE TABLE IF NOT EXISTS push_log (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,

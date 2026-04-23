@@ -1206,6 +1206,93 @@ a:hover {
   border: 1px solid var(--border);
 }
 
+/* Settings Telegram blok */
+.settings-telegram {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.settings-telegram h4 {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-telegram .chip {
+  background: rgba(0, 136, 204, 0.15);
+  color: #4dabf7;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 500;
+  border: 1px solid rgba(0, 136, 204, 0.3);
+}
+.settings-telegram-hint { font-size: 12px; line-height: 1.5; }
+.settings-tg-code {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+}
+.settings-tg-code-label { color: var(--text-dim); font-size: 12px; }
+.settings-tg-code-value {
+  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.settings-tg-code code {
+  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.settings-tg-code .small { font-size: 11px; margin-top: 4px; }
+.settings-tg-linked { display: flex; flex-direction: column; gap: 8px; }
+.tg-links-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.tg-links-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.tg-links-list .tg-meta { display: flex; flex-direction: column; gap: 2px; }
+.tg-links-list .tg-meta small { color: var(--text-muted); font-size: 11px; }
+.tg-unlink-btn {
+  background: transparent;
+  border: 0;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.tg-unlink-btn:hover { background: rgba(239, 68, 68, 0.1); }
+
+.muted.small { font-size: 11px; }
+
 /* Settings akkaunt-blok */
 .settings-account {
   border-top: 1px solid var(--border);

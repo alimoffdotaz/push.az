@@ -43,9 +43,15 @@ RP_ID = "push-az.pages.dev"
 RP_NAME = "push.az"
 EXPECTED_ORIGIN = "https://push-az.pages.dev"
 
+# Telegram — bez @, bez https
+TELEGRAM_BOT_USERNAME = "push_az_bot"
+
 # ============================================================================
 # Secrets (ustanavlivay cherez dashboard ili:
 #   wrangler secret put VAPID_PRIVATE_KEY
 #   wrangler secret put VAPID_PUBLIC_KEY
 #   wrangler secret put VAPID_SUBJECT
+#   wrangler secret put TELEGRAM_BOT_TOKEN
+#   wrangler secret put TELEGRAM_WEBHOOK_SECRET
+#   wrangler secret put ADMIN_TOKEN
 # ============================================================================
