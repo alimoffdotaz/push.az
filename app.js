@@ -478,7 +478,7 @@ function renderAuthScreen() {
     if (actions) actions.hidden = true;
     setAuthStatus('Snachala nastroy Worker URL', 'pending');
   } else {
-    if (workerRow) workerRow.hidden = false;
+    if (workerRow) workerRow.hidden = true;
     if (actions) actions.hidden = false;
     setAuthStatus('', null);
   }
