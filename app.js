@@ -156,12 +156,21 @@ function toLocalInputValue(date) {
 }
 
 function setMinDateTime() {
+  if (!whenEl) return;
   const now = new Date();
   now.setSeconds(0, 0);
-  whenEl.min = toLocalInputValue(now);
-  if (!whenEl.value) {
+  const minStr = toLocalInputValue(now);
+  whenEl.min = minStr;
+  const cur = whenEl.value;
+  if (!cur) {
     const suggested = new Date(now.getTime() + 5 * 60000);
     whenEl.value = toLocalInputValue(suggested);
+    return;
+  }
+  // Строка ISO-подобного локального времени сравнивается лексикографически с min.
+  if (cur < minStr) {
+    const bump = new Date(now.getTime() + 60000);
+    whenEl.value = toLocalInputValue(bump);
   }
 }
 
@@ -220,11 +229,12 @@ async function initConfig() {
 }
 
 async function changeLang(lang, opts = {}) {
-  if (!SUPPORTED_LANGS.includes(lang)) return;
-  setLang(lang);
-  try { await config.set('lang', lang); } catch {}
+  const L = String(lang || '').trim().toLowerCase();
+  if (!SUPPORTED_LANGS.includes(L)) return;
+  setLang(L);
+  try { await config.set('lang', L); } catch {}
   if (!opts.skipServer && state.workerUrl && state.sessionToken) {
-    try { await api('/api/user/lang', { method: 'POST', body: { lang } }); } catch {}
+    try { await api('/api/user/lang', { method: 'POST', body: { lang: L } }); } catch {}
   }
 }
 
@@ -1083,12 +1093,23 @@ function renderItem(r, isPast = false) {
 
 async function addReminder(e) {
   e.preventDefault();
-  const title = titleEl.value.trim();
-  const note = noteEl.value.trim();
-  const whenStr = whenEl.value;
-  const repeat = repeatEl.value;
+  setMinDateTime();
+  if (form && typeof form.reportValidity === 'function' && !form.reportValidity()) {
+    return;
+  }
+  const title = (titleEl?.value || '').trim();
+  const note = (noteEl?.value || '').trim();
+  const whenStr = whenEl?.value || '';
+  const repeat = repeatEl?.value || 'none';
   const tone = toneEl ? toneEl.value : 'friendly';
-  if (!title || !whenStr) return;
+  if (!title) {
+    toast(t('toast.compose_title'), 'error');
+    return;
+  }
+  if (!whenStr) {
+    toast(t('toast.compose_when'), 'error');
+    return;
+  }
 
   const fireAt = new Date(whenStr).getTime();
   if (isNaN(fireAt)) {
@@ -1110,17 +1131,22 @@ async function addReminder(e) {
     createdAt: Date.now(),
   };
 
-  await db.put(reminder);
-  state.reminders.push(reminder);
-  state.reminders.sort((a, b) => a.fireAt - b.fireAt);
-  await scheduleLocalNotification(reminder);
-  syncReminderToBackend(reminder);
-  render();
-  form.reset();
-  if (toneEl) toneEl.value = tone;
-  setMinDateTime();
-  closeComposer();
-  toast(t('toast.created'), 'success');
+  try {
+    await db.put(reminder);
+    state.reminders.push(reminder);
+    state.reminders.sort((a, b) => a.fireAt - b.fireAt);
+    await scheduleLocalNotification(reminder);
+    syncReminderToBackend(reminder);
+    render();
+    form.reset();
+    if (toneEl) toneEl.value = tone;
+    setMinDateTime();
+    closeComposer();
+    toast(t('toast.created'), 'success');
+  } catch (err) {
+    console.error('addReminder', err);
+    toast(t('err.generic', { err: err?.message || err }), 'error');
+  }
 }
 
 const composerDialog = document.getElementById('composer-dialog');
@@ -1717,12 +1743,18 @@ async function registerSW() {
 // ============================================================================
 
 function bindEvents() {
-  form.addEventListener('submit', addReminder);
+  if (form) form.addEventListener('submit', addReminder);
   if (resetBtn) resetBtn.addEventListener('click', () => { form.reset(); setMinDateTime(); closeComposer(); });
   permissionBtn.addEventListener('click', requestPermission);
   testLink.addEventListener('click', sendTestNotification);
   if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
   if (settingsForm) settingsForm.addEventListener('submit', saveSettings);
+  const settingsLangSel = document.getElementById('settings-lang');
+  if (settingsLangSel) {
+    settingsLangSel.addEventListener('change', async () => {
+      await changeLang(settingsLangSel.value);
+    });
+  }
   document.querySelectorAll('[data-close-settings]').forEach((b) =>
     b.addEventListener('click', closeSettings),
   );

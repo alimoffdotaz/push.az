@@ -117,7 +117,7 @@
 
   <!-- Модалка создания reminder'а -->
   <dialog id="composer-dialog" class="composer-dialog">
-    <form id="reminder-form" class="composer-form" method="dialog" autocomplete="off">
+    <form id="reminder-form" class="composer-form" autocomplete="off" action="#">
       <header class="composer-header">
         <h3 data-i18n="composer.new">Новое напоминание</h3>
         <button type="button" class="icon-btn" data-close-composer data-i18n-aria-label="header.close" aria-label="Закрыть">
@@ -326,9 +326,9 @@
 
       <div class="auth-lang-row">
         <select id="auth-lang">
-          <option value="ru">Русский</option>
-          <option value="az">Azərbaycan</option>
-          <option value="en">English</option>
+          <option value="ru" data-i18n="lang.ru">Русский</option>
+          <option value="az" data-i18n="lang.az">Azərbaycan</option>
+          <option value="en" data-i18n="lang.en">English</option>
         </select>
       </div>
 

@@ -7,11 +7,11 @@ export const DEFAULT_LANG = 'ru';
 const DICT = {
   ru: {
     // Meta
-    'meta.title': 'push.az — Особый reminder',
-    'meta.description': 'push.az — reminder, который точно донесёт уведомление',
+    'meta.title': 'push.az — особое напоминание',
+    'meta.description': 'push.az — напоминание, которое точно донесёт уведомление',
 
     // Header
-    'header.tagline': 'Особый reminder · уникальный push каждый раз',
+    'header.tagline': 'Особое напоминание · каждый раз новый текст пуша',
     'header.offline': 'Оффлайн',
     'header.permission': 'Разрешить',
     'header.settings': 'Настройки',
@@ -19,7 +19,7 @@ const DICT = {
 
     // Install banner
     'install.title': 'Установи push.az',
-    'install.hint': 'Чтобы push работал надёжно и в списке уведомлений появился push.az.',
+    'install.hint': 'Чтобы пуши работали надёжно и в списке уведомлений появился push.az.',
     'install.btn': 'Установить',
     'install.how': 'Как?',
     'install.ok_toast': 'Установлено ✓',
@@ -30,7 +30,7 @@ const DICT = {
     'install.iphone.1': 'Внизу (или справа сверху) нажми <kbd>Поделиться</kbd> — квадратик со стрелкой вверх.',
     'install.iphone.2': 'В меню пролистай и выбери <kbd>На экран «Домой»</kbd>.',
     'install.iphone.3': 'Нажми <kbd>Добавить</kbd>.',
-    'install.iphone.4': 'Открой push.az с home screen (не из Safari).',
+    'install.iphone.4': 'Открой push.az с экрана «Домой» (не из Safari).',
 
     'install.mac_safari.title': 'Mac — Safari (macOS 14+)',
     'install.mac_safari.1': 'В меню сверху: <kbd>Файл</kbd> → <kbd>Добавить в Dock…</kbd>',
@@ -42,7 +42,7 @@ const DICT = {
     'install.mac_chrome.1': 'В адресной строке справа нажми иконку <kbd>Установить</kbd> (монитор со стрелкой вниз).',
     'install.mac_chrome.2': 'Или — меню <kbd>…</kbd> → <kbd>Установить push.az</kbd>.',
     'install.mac_chrome.3': 'Нажми <kbd>Установить</kbd>.',
-    'install.mac_chrome.4': 'Открой push.az из Launchpad / Программы.',
+    'install.mac_chrome.4': 'Открой push.az из Launchpad или папки «Программы».',
 
     'install.android.title': 'Android — Chrome',
     'install.android.1': 'Меню <kbd>⋮</kbd> сверху справа.',
@@ -62,7 +62,7 @@ const DICT = {
     'reminders.active': 'Активные',
     'reminders.create': 'Создать напоминание',
     'reminders.empty_title': 'Пока пусто',
-    'reminders.empty_hint': 'Нажми «Создать напоминание» — push придёт вовремя и каждый раз с другим текстом.',
+    'reminders.empty_hint': 'Нажми «Создать напоминание» — пуш придёт вовремя и каждый раз с другим текстом.',
     'reminders.archive': 'Архив',
     'reminders.delete': 'Удалить',
 
@@ -87,14 +87,14 @@ const DICT = {
     'composer.submit': 'Создать',
 
     // Repeat tags
-    'repeat.daily': 'ежедневно',
-    'repeat.weekly': 'еженедельно',
-    'repeat.monthly': 'ежемесячно',
+    'repeat.daily': 'каждый день',
+    'repeat.weekly': 'каждую неделю',
+    'repeat.monthly': 'каждый месяц',
 
     // Tone tags
     'tone.friendly': 'тепло',
     'tone.urgent': 'срочно',
-    'tone.funny': 'смешно',
+    'tone.funny': 'с юмором',
     'tone.aggressive': 'жёстко',
 
     // Relative time
@@ -110,21 +110,21 @@ const DICT = {
     'takeover.snooze10': 'Отложить на 10 мин',
     'takeover.more': '+{n} ещё',
     'takeover.challenge.1': 'Нажми <strong>{n}</strong>, чтобы закрыть',
-    'takeover.challenge.2': 'Чтобы подтвердить — тап на <strong>{n}</strong>',
+    'takeover.challenge.2': 'Чтобы подтвердить — нажми <strong>{n}</strong>',
     'takeover.challenge.3': 'Прочёл? Нажми <strong>{n}</strong>',
     'takeover.challenge.4': 'Цифра <strong>{n}</strong> — и свободен',
     'takeover.wrong': 'Не та. Прочти внимательно.',
-    'takeover.test_title': 'Тест challenge',
+    'takeover.test_title': 'Пробная проверка внимания',
     'takeover.test_note': 'Нажми правильную цифру, чтобы закрыть.',
 
     // Settings
     'settings.title': 'Настройки',
     'settings.worker_url': 'Cloudflare Worker URL',
-    'settings.worker_hint': 'Без URL приложение работает локально — push будет приходить, только пока app открыт.',
+    'settings.worker_hint': 'Без URL приложение работает локально — пуш будет приходить только пока открыто приложение.',
     'settings.lang': 'Язык',
-    'settings.test_badge': 'Тест бейджа',
-    'settings.clear_badge': 'Сбросить бейдж',
-    'settings.test_challenge': 'Тест challenge',
+    'settings.test_badge': 'Проверить значок на иконке',
+    'settings.clear_badge': 'Сбросить значок',
+    'settings.test_challenge': 'Пробное уведомление',
     'settings.clear_missed': 'Очистить пропущенные',
     'settings.cancel': 'Отмена',
     'settings.save': 'Сохранить',
@@ -149,36 +149,36 @@ const DICT = {
 
     // Account
     'acc.title': 'Аккаунт',
-    'acc.add_passkey': 'Добавить passkey на другом устройстве',
+    'acc.add_passkey': 'Добавить ключ доступа на другом устройстве',
     'acc.logout': 'Выйти из аккаунта',
     'acc.logout_confirm': 'Выйти из аккаунта? Локальные напоминания будут очищены на этом устройстве (на сервере они сохранятся).',
     'acc.logout_toast': 'Вышли из аккаунта',
-    'acc.passkey_added': 'Passkey добавлен ✓',
+    'acc.passkey_added': 'Ключ доступа добавлен ✓',
     'acc.hello': 'Привет, {name}!',
 
     // Auth screen
     'auth.tagline': 'Войди, чтобы напоминания синхронизировались на всех твоих устройствах',
     'auth.save_url': 'Сохранить URL',
-    'auth.login': 'Войти с passkey',
+    'auth.login': 'Войти по ключу доступа',
     'auth.or': 'или',
     'auth.name_label': 'Имя (любое)',
     'auth.name_ph': 'Например: Айхан',
     'auth.register': 'Создать аккаунт',
-    'auth.hint': 'Passkey — это безопасный вход по Face ID / Touch ID / Windows Hello. Никаких паролей. Аккаунт привязан к passkey на этом устройстве. На других устройствах залогинься через iCloud Keychain / Google Password Manager или добавь новый passkey из настроек.',
+    'auth.hint': 'Ключ доступа (passkey) — безопасный вход по Face ID, Touch ID или Windows Hello. Без пароля. Аккаунт привязан к ключу на этом устройстве. На других устройствах войди через связку ключей iCloud или Google или добавь новый ключ в настройках.',
     'auth.need_worker': 'Сначала настрой Worker URL',
     'auth.bad_url': 'Введи корректный URL (https://…)',
     'auth.checking': 'Проверяю…',
     'auth.worker_ok': 'Worker OK — входи через passkey',
     'auth.worker_err': 'Worker не отвечает: {err}',
-    'auth.checking_passkey': 'Проверяю passkey…',
+    'auth.checking_passkey': 'Проверяю ключ доступа…',
     'auth.welcome': 'Добро пожаловать',
-    'auth.creating': 'Создаю passkey…',
+    'auth.creating': 'Создаю ключ доступа…',
     'auth.created': 'Аккаунт создан',
 
     // Errors
     'err.worker_not_configured': 'Worker не настроен',
-    'err.passkey_unsupported': 'Passkey не поддерживается в этом браузере',
-    'err.passkey_cancelled': 'Passkey отменён',
+    'err.passkey_unsupported': 'Ключ доступа не поддерживается в этом браузере',
+    'err.passkey_cancelled': 'Вход по ключу отменён',
     'err.unauthorized': 'Не авторизован',
     'err.generic': 'Ошибка: {err}',
 
@@ -189,12 +189,14 @@ const DICT = {
     'toast.done': 'Выполнено ✓',
     'toast.bad_date': 'Некорректная дата',
     'toast.time_passed': 'Время уже прошло',
+    'toast.compose_title': 'Введи название напоминания',
+    'toast.compose_when': 'Выбери дату и время',
     'toast.notifications_on': 'Уведомления включены',
-    'toast.test_push_sent': 'Тест-push отправлен с сервера',
+    'toast.test_push_sent': 'Пробный пуш отправлен с сервера',
     'toast.local_test_sent': 'Локальное тест-уведомление отправлено',
-    'toast.badge_unsupported': 'Badge API не поддерживается на этом устройстве',
-    'toast.badge_set': 'Бейдж = 3 — посмотри на иконку на главном экране',
-    'toast.badge_cleared': 'Бейдж сброшен',
+    'toast.badge_unsupported': 'Значок на иконке не поддерживается на этом устройстве',
+    'toast.badge_set': 'На иконке число 3 — посмотри на главный экран',
+    'toast.badge_cleared': 'Значок на иконке сброшен',
     'toast.failed': 'Не удалось: {err}',
     'toast.cleared_missed': 'Очищено: {n}',
     'toast.no_missed': 'Пропущенных не было',
@@ -404,6 +406,8 @@ const DICT = {
     'toast.done': 'Edildi ✓',
     'toast.bad_date': 'Səhv tarix',
     'toast.time_passed': 'Vaxt keçib',
+    'toast.compose_title': 'Xatırladıcının adını daxil et',
+    'toast.compose_when': 'Tarix və vaxtı seç',
     'toast.notifications_on': 'Bildirişlər aktivdir',
     'toast.test_push_sent': 'Test-push serverdən göndərildi',
     'toast.local_test_sent': 'Lokal test-bildiriş göndərildi',
@@ -613,6 +617,8 @@ const DICT = {
     'toast.done': 'Done ✓',
     'toast.bad_date': 'Invalid date',
     'toast.time_passed': 'Time has passed',
+    'toast.compose_title': 'Enter a reminder title',
+    'toast.compose_when': 'Pick date and time',
     'toast.notifications_on': 'Notifications enabled',
     'toast.test_push_sent': 'Test push sent from server',
     'toast.local_test_sent': 'Local test notification sent',
@@ -649,8 +655,8 @@ const DICT = {
     'push.action.snooze': 'Snooze 10 min',
     'push.final_prefix': '🚨 FINAL CALL — ',
 
-    'lang.ru': 'Русский',
-    'lang.az': 'Azərbaycan',
+    'lang.ru': 'Russian',
+    'lang.az': 'Azerbaijani',
     'lang.en': 'English',
   },
 };
@@ -686,18 +692,26 @@ export function localeFor(lang) {
 }
 
 function format(str, params) {
-  if (!params) return str;
-  return str.replace(/\{(\w+)\}/g, (_, k) => (params[k] !== undefined ? String(params[k]) : '{' + k + '}'));
+  if (str == null) return '';
+  if (!params) return String(str);
+  return String(str).replace(/\{(\w+)\}/g, (_, k) => (params[k] !== undefined ? String(params[k]) : '{' + k + '}'));
 }
 
 export function t(key, params) {
+  if (key == null || key === '') return '';
   const dict = DICT[currentLang] || DICT[DEFAULT_LANG];
   const fallback = DICT[DEFAULT_LANG];
-  const raw = (dict && dict[key]) || (fallback && fallback[key]) || key;
+  const raw = (dict && dict[key]) || (fallback && fallback[key]) || String(key);
   return format(raw, params);
 }
 
+function readI18nAttr(el, name) {
+  const v = el.getAttribute(name);
+  return (v != null && v !== '') ? v : '';
+}
+
 // Walks DOM and populates every [data-i18n*] attribute.
+// getAttribute: Safari надёжнее, чем dataset, для <option> и имён вроде data-i18n.
 //  - data-i18n="key"              → textContent
 //  - data-i18n-html="key"         → innerHTML (use for <kbd>, <strong>)
 //  - data-i18n-placeholder="key"  → placeholder
@@ -705,19 +719,29 @@ export function t(key, params) {
 //  - data-i18n-aria-label="key"   → aria-label
 export function applyTranslations(root = document) {
   root.querySelectorAll('[data-i18n]').forEach((el) => {
-    el.textContent = t(el.dataset.i18n);
+    const key = readI18nAttr(el, 'data-i18n');
+    if (!key) return;
+    el.textContent = t(key);
   });
   root.querySelectorAll('[data-i18n-html]').forEach((el) => {
-    el.innerHTML = t(el.dataset.i18nHtml);
+    const key = readI18nAttr(el, 'data-i18n-html');
+    if (!key) return;
+    el.innerHTML = t(key);
   });
   root.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-    el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
+    const key = readI18nAttr(el, 'data-i18n-placeholder');
+    if (!key) return;
+    el.setAttribute('placeholder', t(key));
   });
   root.querySelectorAll('[data-i18n-title]').forEach((el) => {
-    el.setAttribute('title', t(el.dataset.i18nTitle));
+    const key = readI18nAttr(el, 'data-i18n-title');
+    if (!key) return;
+    el.setAttribute('title', t(key));
   });
   root.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
-    el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel));
+    const key = readI18nAttr(el, 'data-i18n-aria-label');
+    if (!key) return;
+    el.setAttribute('aria-label', t(key));
   });
   // meta description + title
   const metaDesc = document.querySelector('meta[name="description"]');
