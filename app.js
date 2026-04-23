@@ -49,8 +49,6 @@ const emptyState = $('#empty-state');
 const countBadge = $('#count-badge');
 const banner = $('#status-banner');
 const permissionBtn = $('#permission-btn');
-const testLink = $('#test-notification');
-const installHint = $('#install-hint');
 const tpl = $('#reminder-item-template');
 const toastRoot = $('#toast-root');
 const settingsBtn = $('#settings-btn');
@@ -1238,7 +1236,7 @@ async function scheduleLocalNotification(r) {
     await cancelLocalNotification(r.id);
     const fireAt = nextFireAt(r);
     await reg.showNotification(r.title, {
-      body: r.note || t('test.default_body'),
+      body: r.note || t('notify.default_body'),
       tag: 'push-az-local-' + r.id,
       icon: '/icons/icon.svg',
       badge: '/icons/icon.svg',
@@ -1516,33 +1514,6 @@ async function requestPermission() {
   }
 }
 
-async function sendTestNotification(e) {
-  e.preventDefault();
-  if (Notification.permission !== 'granted') {
-    await requestPermission();
-    if (Notification.permission !== 'granted') return;
-  }
-
-  if (state.workerUrl && state.pushSubscribed) {
-    try {
-      await api('/api/test-push', { method: 'POST', body: {} });
-      toast(t('toast.test_push_sent'), 'success');
-      return;
-    } catch (err) {
-      console.warn('Backend test push failed, falling back to local:', err);
-    }
-  }
-
-  const reg = await navigator.serviceWorker.ready;
-  await reg.showNotification(t('test.notification_title'), {
-    body: t('test.body'),
-    icon: '/icons/icon.svg',
-    badge: '/icons/icon.svg',
-    tag: 'push-az-test',
-  });
-  toast(t('toast.local_test_sent'));
-}
-
 // ============================================================================
 // SW messages (ot klikov po pushu)
 // ============================================================================
@@ -1554,12 +1525,8 @@ function setupSWMessageHandler() {
     const { reminderId, action } = msg;
 
     if (msg.type === 'open-challenge') {
-      // Pol'zovatel' tapnul na push \u2014 prinuditelьno pokazhem takeover
-      if (!reminderId || reminderId === 'test') {
-        // Dlya test-pusha prosto pokazyvaem challenge-demo
-        showTakeoverForTest();
-        return;
-      }
+      // Pol'zovatel' tapnul na push — prinuditel'no pokazhem takeover
+      if (!reminderId || reminderId === 'test') return;
       const r = state.reminders.find((x) => x.id === reminderId);
       if (r) {
         if (state.takeoverActive) hideTakeover();
@@ -1597,19 +1564,6 @@ function setupSWMessageHandler() {
       }
     }
   });
-}
-
-function showTakeoverForTest() {
-  const fake = { id: 'test', title: t('takeover.test_title'), note: t('takeover.test_note') };
-  state.takeoverActive = true;
-  takeoverTitle.textContent = fake.title;
-  takeoverNote.textContent = fake.note;
-  takeoverNote.hidden = false;
-  takeoverCounter.hidden = true;
-  takeoverEl.dataset.reminderId = 'test';
-  takeoverEl.hidden = false;
-  takeoverEl.classList.add('active');
-  renderChallenge(false);
 }
 
 // ============================================================================
@@ -1785,7 +1739,6 @@ async function registerSW() {
 function bindEvents() {
   if (form) form.addEventListener('submit', addReminder);
   permissionBtn.addEventListener('click', requestPermission);
-  testLink.addEventListener('click', sendTestNotification);
   if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
   if (settingsForm) settingsForm.addEventListener('submit', saveSettings);
   const settingsLangSel = document.getElementById('settings-lang');
@@ -1810,42 +1763,6 @@ function bindEvents() {
   );
 
   if (takeoverSnooze) takeoverSnooze.addEventListener('click', takeoverSnoozeAction);
-
-  const testBadgeBtn = document.getElementById('test-badge-btn');
-  const clearBadgeBtn = document.getElementById('clear-badge-btn');
-  const testChallengeBtn = document.getElementById('test-challenge-btn');
-
-  if (testBadgeBtn) {
-    testBadgeBtn.addEventListener('click', async () => {
-      if (!('setAppBadge' in navigator)) {
-        toast(t('toast.badge_unsupported'), 'error');
-        return;
-      }
-      try {
-        await navigator.setAppBadge(3);
-        toast(t('toast.badge_set'), 'success');
-      } catch (err) {
-        toast(t('toast.failed', { err: err?.message || err }), 'error');
-      }
-    });
-  }
-
-  if (clearBadgeBtn) {
-    clearBadgeBtn.addEventListener('click', async () => {
-      try {
-        if (navigator.clearAppBadge) await navigator.clearAppBadge();
-        toast(t('toast.badge_cleared'), 'success');
-      } catch {}
-    });
-  }
-
-  if (testChallengeBtn) {
-    testChallengeBtn.addEventListener('click', () => {
-      if (settingsDialog.close) settingsDialog.close();
-      else settingsDialog.hidden = true;
-      setTimeout(() => showTakeoverForTest(), 300);
-    });
-  }
 
   const clearMissedBtn = document.getElementById('clear-missed-btn');
   if (clearMissedBtn) {

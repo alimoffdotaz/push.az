@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v10';
+const CACHE = 'push-az-v11';
 const ASSETS = [
   '/',
   '/index.html',
@@ -164,7 +164,7 @@ self.addEventListener('push', (event) => {
   // Dizayn-reshenie: ACK vozmozhen TOL'KO cherez in-app challenge.
   // V pushe mozhno tol'ko otlozhit' ili otkryt' app. Gotovo v notif net \u2014
   // chtoby nel'zya bylo "avtoматom" ubit' napominaniye.
-  if (isReminder || data.type === 'test') {
+  if (isReminder) {
     options.actions = [
       { action: 'open', title: L.action_open },
       { action: 'snooze', title: L.action_snooze },
@@ -188,7 +188,7 @@ self.addEventListener('push', (event) => {
   // reminder (ili test), stavim min 1. Yesli backend peredal
   // pendingCount > 0 \u2014 ispol'zuem ego.
   let badgeCount = 0;
-  if (isReminder || data.type === 'test') {
+  if (isReminder) {
     badgeCount = pendingCount > 0 ? pendingCount : 1;
   }
 

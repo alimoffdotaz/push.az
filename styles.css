@@ -1,14 +1,14 @@
 :root {
-  --bg: #080b0f;
-  --bg-grad-1: #0e1318;
-  --bg-grad-2: #0a1520;
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-2: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.13);
-  --text: #e8eaed;
-  --text-dim: #9aa3ad;
-  --text-muted: #6b7280;
+  --bg: #2a3444;
+  --bg-grad-1: #323e52;
+  --bg-grad-2: #252f3e;
+  --surface: rgba(255, 255, 255, 0.1);
+  --surface-2: rgba(255, 255, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --text: #f4f6f8;
+  --text-dim: #c5ccd6;
+  --text-muted: #8e98a8;
   /* Один спокойный акцент (бирюза), второй — лёгкий холодный блик */
   --accent: #2dd4bf;
   --accent-2: #38bdf8;
@@ -41,11 +41,12 @@ body {
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
+  font-size: 17px;
   color: var(--text);
   background:
-    radial-gradient(900px 520px at 12% -8%, rgba(45, 212, 191, 0.09), transparent 58%),
-    radial-gradient(720px 480px at 96% 4%, rgba(56, 189, 248, 0.06), transparent 55%),
-    linear-gradient(168deg, var(--bg-grad-1) 0%, var(--bg) 45%, var(--bg-grad-2) 100%);
+    radial-gradient(1000px 560px at 10% -6%, rgba(45, 212, 191, 0.12), transparent 55%),
+    radial-gradient(780px 500px at 98% 6%, rgba(56, 189, 248, 0.08), transparent 52%),
+    linear-gradient(168deg, var(--bg-grad-1) 0%, var(--bg) 42%, var(--bg-grad-2) 100%);
   min-height: 100vh;
   min-height: 100dvh;
   line-height: 1.55;
@@ -132,16 +133,16 @@ body.has-overdue .brand-text h1 {
 }
 
 .brand-text h1 {
-  font-size: 21px;
+  font-size: 23px;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
 .tagline {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-dim);
-  margin-top: 1px;
-  line-height: 1.4;
+  margin-top: 2px;
+  line-height: 1.45;
   max-width: 42ch;
 }
 
@@ -156,9 +157,9 @@ body.has-overdue .brand-text h1 {
 }
 
 .section-title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-dim);
   text-transform: none;
   letter-spacing: 0.02em;
   margin-bottom: 12px;
@@ -178,7 +179,7 @@ body.has-overdue .brand-text h1 {
 }
 
 .field > span {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-dim);
   font-weight: 500;
 }
@@ -194,7 +195,7 @@ body.has-overdue .brand-text h1 {
   transition: border-color var(--transition), background var(--transition),
     box-shadow var(--transition);
   width: 100%;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text);
   resize: vertical;
 }
@@ -256,11 +257,11 @@ body.has-overdue .brand-text h1 {
   border: 1px solid var(--border-strong);
   background: var(--surface-2);
   color: var(--text);
-  padding: 10px 16px;
+  padding: 12px 18px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   transition: transform var(--transition), background var(--transition),
     border-color var(--transition), opacity var(--transition);
 }
@@ -304,11 +305,11 @@ body.has-overdue .brand-text h1 {
 }
 
 .banner {
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   background: var(--surface);
-  font-size: 14px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -339,9 +340,9 @@ body.has-overdue .brand-text h1 {
   background: var(--accent-soft);
   color: var(--accent-on-surface);
   border: 1px solid rgba(45, 212, 191, 0.28);
-  padding: 2px 10px;
+  padding: 3px 11px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   min-width: 24px;
   text-align: center;
@@ -397,14 +398,14 @@ body.has-overdue .brand-text h1 {
 }
 
 .reminder-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
   word-break: break-word;
 }
 
 .tag {
-  font-size: 11px;
+  font-size: 12px;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--accent-soft);
@@ -417,7 +418,7 @@ body.has-overdue .brand-text h1 {
 .reminder-note {
   margin-top: 4px;
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 15px;
   word-break: break-word;
   white-space: pre-wrap;
 }
@@ -428,7 +429,7 @@ body.has-overdue .brand-text h1 {
   align-items: center;
   gap: 6px;
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .reminder-when svg {
@@ -514,14 +515,14 @@ body.has-overdue .brand-text h1 {
 }
 
 .empty-state h3 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text);
   margin-bottom: 4px;
 }
 
 .empty-state p {
-  font-size: 13px;
+  font-size: 15px;
   max-width: 320px;
   margin: 0 auto;
 }
@@ -542,7 +543,7 @@ body.has-overdue .brand-text h1 {
 .app-footer {
   text-align: center;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 14px;
   margin-top: 12px;
 }
 
@@ -560,11 +561,11 @@ body.has-overdue .brand-text h1 {
 }
 
 .toast {
-  background: rgba(15, 23, 42, 0.95);
+  background: rgba(30, 38, 52, 0.96);
   border: 1px solid var(--border-strong);
-  padding: 10px 16px;
+  padding: 12px 18px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 15px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -615,9 +616,9 @@ body.has-overdue .brand-text h1 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
   letter-spacing: 0.02em;
   border: 1px solid var(--border-strong);
@@ -656,7 +657,7 @@ body.has-overdue .brand-text h1 {
 .composer-dialog {
   border: 1px solid var(--border-strong);
   border-radius: calc(var(--radius) + 2px);
-  background: linear-gradient(180deg, rgba(20, 28, 36, 0.98), rgba(10, 14, 20, 0.99));
+  background: linear-gradient(180deg, rgba(48, 58, 74, 0.98), rgba(34, 42, 54, 0.99));
   color: var(--text);
   padding: 0;
   max-width: 440px;
@@ -685,15 +686,15 @@ body.has-overdue .brand-text h1 {
 }
 
 .composer-header h3 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .create-reminder-btn {
   width: 100%;
   justify-content: center;
-  padding: 16px 18px;
-  font-size: 16px;
+  padding: 18px 20px;
+  font-size: 18px;
   font-weight: 600;
   margin-bottom: 14px;
   gap: 10px;
@@ -718,12 +719,12 @@ body.has-overdue .brand-text h1 {
 }
 
 .settings-header h3 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .hint {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-dim);
   line-height: 1.55;
 }
@@ -737,7 +738,7 @@ body.has-overdue .brand-text h1 {
 }
 
 .settings-status {
-  font-size: 13px;
+  font-size: 15px;
   min-height: 20px;
   color: var(--text-dim);
 }
@@ -860,8 +861,8 @@ body.has-overdue .brand-text h1 {
 }
 
 .btn-small {
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 10px 14px;
+  font-size: 15px;
   border-radius: 10px;
 }
 
@@ -896,9 +897,9 @@ body.has-overdue .brand-text h1 {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(900px 600px at 50% 28%, rgba(45, 212, 191, 0.14), transparent 62%),
-    radial-gradient(900px 600px at 50% 78%, rgba(56, 189, 248, 0.1), transparent 60%),
-    rgba(6, 8, 12, 0.92);
+    radial-gradient(900px 600px at 50% 28%, rgba(45, 212, 191, 0.12), transparent 62%),
+    radial-gradient(900px 600px at 50% 78%, rgba(56, 189, 248, 0.08), transparent 60%),
+    rgba(24, 30, 40, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   animation: takeover-bg 10s ease-in-out infinite alternate;
@@ -916,7 +917,7 @@ body.has-overdue .brand-text h1 {
   text-align: center;
   padding: 40px 24px;
   border-radius: 24px;
-  background: rgba(14, 18, 24, 0.82);
+  background: rgba(44, 54, 68, 0.88);
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow);
   animation: takeover-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -964,7 +965,7 @@ body.has-overdue .brand-text h1 {
 }
 
 .takeover-title {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 8px;
@@ -974,7 +975,7 @@ body.has-overdue .brand-text h1 {
 .takeover-note {
   color: var(--text-dim);
   margin-bottom: 12px;
-  font-size: 15px;
+  font-size: 17px;
   white-space: pre-wrap;
 }
 
@@ -1007,7 +1008,7 @@ body.has-overdue .brand-text h1 {
 
 .takeover-challenge-prompt {
   text-align: center;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: #fff;
   margin-bottom: 14px;
@@ -1179,14 +1180,14 @@ body.has-overdue .brand-text h1 {
 .auth-logo svg { width: 28px; height: 28px; }
 
 .auth-brand h2 {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.5px;
 }
 
 .auth-tagline {
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.45;
   max-width: 340px;
 }

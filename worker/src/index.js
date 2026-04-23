@@ -196,11 +196,6 @@ async function handleRequest(request, env, ctx) {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
     return handleClearMissed(request, env, user);
   }
-  if (path === '/api/test-push' && method === 'POST') {
-    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
-    return handleTestPush(request, env, ctx, user);
-  }
-
   // Telegram (authenticated)
   if (path === '/api/telegram/link/begin' && method === 'POST') {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
@@ -239,7 +234,6 @@ async function handleRequest(request, env, ctx) {
         'POST   /api/reminders',
         'DELETE /api/reminders/:id',
         'POST   /api/ack',
-        'POST   /api/test-push',
       ],
     }, 200, request, env);
   }
@@ -476,55 +470,6 @@ async function handleAck(request, env, user) {
     .run();
 
   return jsonResponse({ ok: true, acked: true }, 200, request, env);
-}
-
-// ============================================================================
-// /api/test-push — shlyot test-push na ustroystvo (dlya proverki)
-// ============================================================================
-
-async function handleTestPush(request, env, ctx, user) {
-  // Shlyot na vse aktivnye device'y polzovatelya
-  const devices = await env.DB.prepare(
-    `SELECT * FROM devices WHERE user_id = ?1 AND revoked_at IS NULL`,
-  )
-    .bind(user.userId)
-    .all();
-
-  const list = devices.results || [];
-  if (!list.length) return jsonResponse({ error: 'no subscribed devices' }, 404, request, env);
-
-  const vapid = getVapidConfig(env);
-  if (!vapid) return jsonResponse({ error: 'VAPID not configured' }, 500, request, env);
-
-  const testTitles = { ru: 'Тест push.az', az: 'push.az testi', en: 'push.az test' };
-  const lang = user.lang || 'ru';
-  const testReminder = { id: 'test', title: testTitles[lang] || testTitles.ru, note: '', tone: 'friendly' };
-  const built = await buildPushBody(env, testReminder, 2, lang);
-  const pendingCount = await countPendingRemindersForUser(env, user.userId);
-
-  // Telegram test send
-  if (env.TELEGRAM_BOT_TOKEN) {
-    try { await tgSendReminderToUser(env, user.userId, testReminder, built.text, 1, 1); } catch {}
-  }
-
-  let ok = true;
-  for (const d of list) {
-    const result = await sendWebPush(
-      { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
-      {
-        type: 'test',
-        title: 'push.az',
-        body: built.text,
-        reminderId: 'test',
-        pendingCount,
-        lang,
-      },
-      vapid,
-    );
-    if (!result.ok) ok = false;
-  }
-
-  return jsonResponse({ ok, body: built.text, devices: list.length }, ok ? 200 : 502, request, env);
 }
 
 async function countPendingRemindersForUser(env, userId) {
