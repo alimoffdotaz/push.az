@@ -36,6 +36,13 @@ ALLOWED_ORIGIN = "https://push-az.pages.dev"
 AI_MODEL = "@cf/meta/llama-3.2-3b-instruct"
 ENABLE_AI_GENERATION = "true"
 
+# WebAuthn (Passkey) nastroyki.
+# RP_ID — hostname PWA bez skhemy (push-az.pages.dev ili svoy domen)
+# EXPECTED_ORIGIN — polnyy origin s https://
+RP_ID = "push-az.pages.dev"
+RP_NAME = "push.az"
+EXPECTED_ORIGIN = "https://push-az.pages.dev"
+
 # ============================================================================
 # Secrets (ustanavlivay cherez dashboard ili:
 #   wrangler secret put VAPID_PRIVATE_KEY

@@ -220,12 +220,84 @@
 
       <div id="settings-status" class="settings-status"></div>
 
+      <div class="settings-account" id="settings-account" hidden>
+        <h4>Akkaunt</h4>
+        <div class="settings-account-info">
+          <div>
+            <strong id="settings-user-name">—</strong>
+            <small id="settings-user-sub" class="muted"></small>
+          </div>
+        </div>
+        <div class="settings-account-actions">
+          <button type="button" class="btn btn-ghost btn-small" id="add-passkey-btn">
+            Dobavit’ passkey na drugom ustroystve
+          </button>
+          <button type="button" class="btn btn-ghost btn-small btn-danger" id="logout-btn">
+            Vyyti iz akkaunta
+          </button>
+        </div>
+      </div>
+
       <footer class="settings-actions">
         <button type="button" class="btn btn-ghost" data-close-settings>Otmenit’</button>
         <button type="submit" class="btn btn-primary">Sokhranit’</button>
       </footer>
     </form>
   </dialog>
+
+  <!-- Auth ekran: poyavlyayetsya yesli polzovatel ne voshel -->
+  <div id="auth-screen" class="auth-screen" hidden>
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+          </svg>
+        </div>
+        <h2>push.az</h2>
+        <p class="auth-tagline">Voydi chtoby reminder'y sinkhronizirovalis' na vsekh tvoikh ustroystvakh</p>
+      </div>
+
+      <div class="auth-worker-row" id="auth-worker-row">
+        <label class="field">
+          <span>Cloudflare Worker URL</span>
+          <input id="auth-worker-url" type="url" placeholder="https://push-az-worker.xxx.workers.dev"
+            autocomplete="off" spellcheck="false" />
+        </label>
+        <button type="button" class="btn btn-ghost btn-small" id="auth-save-worker">Sokhranit’ URL</button>
+      </div>
+
+      <div class="auth-actions" id="auth-actions" hidden>
+        <button type="button" class="btn btn-primary btn-large" id="auth-login-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          Voyti s passkey
+        </button>
+
+        <div class="auth-divider"><span>ili</span></div>
+
+        <form id="auth-register-form" class="auth-register">
+          <label class="field">
+            <span>Imya (lyuboye)</span>
+            <input id="auth-display-name" type="text" maxlength="60" placeholder="Naprimer: Ayxan" required />
+          </label>
+          <button type="submit" class="btn btn-secondary btn-large">
+            Sozdat’ akkaunt
+          </button>
+        </form>
+
+        <p class="auth-hint">
+          Passkey — eto bezopasnyy vkhod po Face ID / Touch ID / Windows Hello. Nikakikh parol'ey.
+          Tvoy akkaunt privyazan k passkey na etom ustroystve — na drugikh ustroystvakh zalogin'sya
+          cherez iCloud Keychain / Google Password Manager ili dobavь novyy passkey iz nastroyek.
+        </p>
+      </div>
+
+      <div id="auth-status" class="auth-status" hidden></div>
+    </div>
+  </div>
 
   <template id="reminder-item-template">
     <li class="reminder-item card">

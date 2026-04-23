@@ -1,8 +1,8 @@
 {
   "name": "push-az-worker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Cloudflare Worker for push.az — VAPID Web Push + AI-generated content + cron scheduler",
+  "description": "Cloudflare Worker for push.az — VAPID Web Push + AI-generated content + cron scheduler + WebAuthn auth",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -11,5 +11,8 @@
     "db:init": "wrangler d1 execute push-az-db --file=./schema.sql",
     "db:init:local": "wrangler d1 execute push-az-db --local --file=./schema.sql",
     "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^11.0.0"
   }
 }

@@ -15,6 +15,8 @@ const state = {
   vapidPublicKey: '',
   takeoverActive: false,
   syncing: false,
+  sessionToken: '',
+  user: null, // { id, displayName }
 };
 
 // ============================================================================
@@ -198,6 +200,8 @@ async function initConfig() {
   state.deviceId = deviceId;
   state.workerUrl = (await config.get('workerUrl', '')).replace(/\/+$/, '');
   state.vapidPublicKey = await config.get('vapidPublicKey', '');
+  state.sessionToken = await config.get('sessionToken', '');
+  state.user = await config.get('user', null);
 }
 
 // ============================================================================
@@ -208,6 +212,7 @@ async function api(path, options = {}) {
   if (!state.workerUrl) throw new Error('WORKER_URL_NOT_SET');
   const headers = {
     'X-Device-Id': state.deviceId,
+    ...(state.sessionToken ? { Authorization: 'Bearer ' + state.sessionToken } : {}),
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
   };
@@ -220,6 +225,11 @@ async function api(path, options = {}) {
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
   if (!res.ok) {
+    // 401 \u2014 sessiya umerla, sbrosim token chtob ushyol na auth ekran
+    if (res.status === 401 && state.sessionToken) {
+      await clearSession();
+      renderAuthScreen();
+    }
     const err = new Error(data?.error || ('HTTP ' + res.status));
     err.status = res.status;
     err.data = data;
@@ -234,6 +244,351 @@ async function apiHealth(workerUrl) {
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
+}
+
+// ============================================================================
+// Auth (WebAuthn / Passkey)
+// ============================================================================
+
+function b64uToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function bytesToB64u(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Konvertiruem "publicKeyCredentialCreationOptions" iz servera (strokovye b64url)
+// v format chto khochet navigator.credentials.create
+function prepRegisterOptions(opts) {
+  const out = { ...opts };
+  out.challenge = b64uToBytes(opts.challenge);
+  out.user = { ...opts.user, id: b64uToBytes(opts.user.id) };
+  if (Array.isArray(opts.excludeCredentials)) {
+    out.excludeCredentials = opts.excludeCredentials.map((c) => ({
+      ...c,
+      id: b64uToBytes(c.id),
+    }));
+  }
+  return out;
+}
+
+function prepGetOptions(opts) {
+  const out = { ...opts };
+  out.challenge = b64uToBytes(opts.challenge);
+  if (Array.isArray(opts.allowCredentials)) {
+    out.allowCredentials = opts.allowCredentials.map((c) => ({
+      ...c,
+      id: b64uToBytes(c.id),
+    }));
+  }
+  return out;
+}
+
+function serializeRegisterCredential(cred) {
+  return {
+    id: cred.id,
+    rawId: bytesToB64u(cred.rawId),
+    type: cred.type,
+    response: {
+      attestationObject: bytesToB64u(cred.response.attestationObject),
+      clientDataJSON: bytesToB64u(cred.response.clientDataJSON),
+      transports: cred.response.getTransports ? cred.response.getTransports() : undefined,
+    },
+    clientExtensionResults: cred.getClientExtensionResults?.() || {},
+    authenticatorAttachment: cred.authenticatorAttachment,
+  };
+}
+
+function serializeAuthCredential(cred) {
+  return {
+    id: cred.id,
+    rawId: bytesToB64u(cred.rawId),
+    type: cred.type,
+    response: {
+      authenticatorData: bytesToB64u(cred.response.authenticatorData),
+      clientDataJSON: bytesToB64u(cred.response.clientDataJSON),
+      signature: bytesToB64u(cred.response.signature),
+      userHandle: cred.response.userHandle ? bytesToB64u(cred.response.userHandle) : undefined,
+    },
+    clientExtensionResults: cred.getClientExtensionResults?.() || {},
+    authenticatorAttachment: cred.authenticatorAttachment,
+  };
+}
+
+function isPasskeySupported() {
+  return (
+    typeof window !== 'undefined' &&
+    window.PublicKeyCredential &&
+    typeof navigator.credentials?.create === 'function' &&
+    typeof navigator.credentials?.get === 'function'
+  );
+}
+
+async function saveSession(token, user) {
+  state.sessionToken = token;
+  state.user = user;
+  await config.set('sessionToken', token);
+  await config.set('user', user);
+}
+
+async function clearSession() {
+  state.sessionToken = '';
+  state.user = null;
+  await config.set('sessionToken', '');
+  await config.set('user', null);
+}
+
+async function registerNewAccount(displayName) {
+  if (!state.workerUrl) throw new Error('Worker ne nastroen');
+  if (!isPasskeySupported()) throw new Error('Passkey ne podderzhivaetsya v etom brauzere');
+
+  const beginRes = await fetch(state.workerUrl + '/api/auth/register/begin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName: displayName || 'Me' }),
+  });
+  if (!beginRes.ok) {
+    const j = await beginRes.json().catch(() => ({}));
+    throw new Error(j.error || 'register begin failed: HTTP ' + beginRes.status);
+  }
+  const { options, challengeId } = await beginRes.json();
+
+  const publicKey = prepRegisterOptions(options);
+  const cred = await navigator.credentials.create({ publicKey });
+  if (!cred) throw new Error('Passkey otmenyon');
+
+  const finishRes = await fetch(state.workerUrl + '/api/auth/register/finish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      challengeId,
+      attestationResponse: serializeRegisterCredential(cred),
+      deviceId: state.deviceId,
+    }),
+  });
+  if (!finishRes.ok) {
+    const j = await finishRes.json().catch(() => ({}));
+    throw new Error(j.error || 'register finish failed: HTTP ' + finishRes.status);
+  }
+  const data = await finishRes.json();
+  await saveSession(data.token, data.user);
+  return data;
+}
+
+async function loginPasskey() {
+  if (!state.workerUrl) throw new Error('Worker ne nastroen');
+  if (!isPasskeySupported()) throw new Error('Passkey ne podderzhivaetsya v etom brauzere');
+
+  const beginRes = await fetch(state.workerUrl + '/api/auth/login/begin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!beginRes.ok) {
+    const j = await beginRes.json().catch(() => ({}));
+    throw new Error(j.error || 'login begin failed: HTTP ' + beginRes.status);
+  }
+  const { options, challengeId } = await beginRes.json();
+
+  const publicKey = prepGetOptions(options);
+  const cred = await navigator.credentials.get({ publicKey });
+  if (!cred) throw new Error('Passkey otmenyon');
+
+  const finishRes = await fetch(state.workerUrl + '/api/auth/login/finish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      challengeId,
+      assertionResponse: serializeAuthCredential(cred),
+      deviceId: state.deviceId,
+    }),
+  });
+  if (!finishRes.ok) {
+    const j = await finishRes.json().catch(() => ({}));
+    throw new Error(j.error || 'login finish failed: HTTP ' + finishRes.status);
+  }
+  const data = await finishRes.json();
+  await saveSession(data.token, data.user);
+  return data;
+}
+
+async function addPasskeyToAccount() {
+  if (!state.sessionToken) throw new Error('Ne avtorizovan');
+  const beginRes = await api('/api/auth/passkey/add/begin', { method: 'POST', body: {} });
+  const { options, challengeId } = beginRes;
+
+  const publicKey = prepRegisterOptions(options);
+  const cred = await navigator.credentials.create({ publicKey });
+  if (!cred) throw new Error('Passkey otmenyon');
+
+  await api('/api/auth/passkey/add/finish', {
+    method: 'POST',
+    body: {
+      challengeId,
+      attestationResponse: serializeRegisterCredential(cred),
+    },
+  });
+}
+
+// ============================================================================
+// Auth screen UI
+// ============================================================================
+
+function setAuthStatus(msg, kind) {
+  const el = document.getElementById('auth-status');
+  if (!el) return;
+  if (!msg) { el.hidden = true; el.textContent = ''; el.className = 'auth-status'; return; }
+  el.hidden = false;
+  el.textContent = msg;
+  el.className = 'auth-status ' + (kind || 'pending');
+}
+
+function setAuthActionsDisabled(disabled) {
+  const loginBtn = document.getElementById('auth-login-btn');
+  const form = document.getElementById('auth-register-form');
+  if (loginBtn) loginBtn.disabled = disabled;
+  if (form) {
+    Array.from(form.elements).forEach((el) => { el.disabled = disabled; });
+  }
+}
+
+function renderAuthScreen() {
+  const screen = document.getElementById('auth-screen');
+  if (!screen) return;
+  screen.hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  const workerRow = document.getElementById('auth-worker-row');
+  const actions = document.getElementById('auth-actions');
+  const workerInput = document.getElementById('auth-worker-url');
+
+  if (workerInput && state.workerUrl) workerInput.value = state.workerUrl;
+
+  if (!state.workerUrl) {
+    if (workerRow) workerRow.hidden = false;
+    if (actions) actions.hidden = true;
+    setAuthStatus('Snachala nastroy Worker URL', 'pending');
+  } else {
+    if (workerRow) workerRow.hidden = false;
+    if (actions) actions.hidden = false;
+    setAuthStatus('', null);
+  }
+}
+
+function hideAuthScreen() {
+  const screen = document.getElementById('auth-screen');
+  if (screen) screen.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function setupAuthScreen() {
+  const workerInput = document.getElementById('auth-worker-url');
+  const saveWorkerBtn = document.getElementById('auth-save-worker');
+  const loginBtn = document.getElementById('auth-login-btn');
+  const registerForm = document.getElementById('auth-register-form');
+  const displayNameEl = document.getElementById('auth-display-name');
+
+  if (saveWorkerBtn && workerInput) {
+    saveWorkerBtn.addEventListener('click', async () => {
+      const url = (workerInput.value || '').trim().replace(/\/+$/, '');
+      if (!url || !/^https?:\/\//i.test(url)) {
+        setAuthStatus('Vvedi validnyy URL (https://...)', 'error');
+        return;
+      }
+      setAuthStatus('Proverka...', 'pending');
+      try {
+        await apiHealth(url);
+        state.workerUrl = url;
+        await config.set('workerUrl', url);
+        setAuthStatus('Worker OK — vkhodi cherez passkey', 'success');
+        renderAuthScreen();
+      } catch (err) {
+        setAuthStatus('Worker ne otvechaet: ' + (err?.message || err), 'error');
+      }
+    });
+  }
+
+  if (loginBtn) {
+    loginBtn.addEventListener('click', async () => {
+      setAuthActionsDisabled(true);
+      setAuthStatus('Proveryayu passkey...', 'pending');
+      try {
+        const data = await loginPasskey();
+        setAuthStatus('Dobro pozhalovat', 'success');
+        await afterLoginSuccess(data.user);
+      } catch (err) {
+        console.warn('login error', err);
+        setAuthStatus(String(err?.message || err), 'error');
+      } finally {
+        setAuthActionsDisabled(false);
+      }
+    });
+  }
+
+  if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = (displayNameEl?.value || '').trim() || 'Me';
+      setAuthActionsDisabled(true);
+      setAuthStatus('Sozdayu passkey...', 'pending');
+      try {
+        const data = await registerNewAccount(name);
+        setAuthStatus('Akkaunt sozdan', 'success');
+        await afterLoginSuccess(data.user);
+      } catch (err) {
+        console.warn('register error', err);
+        setAuthStatus(String(err?.message || err), 'error');
+      } finally {
+        setAuthActionsDisabled(false);
+      }
+    });
+  }
+}
+
+async function afterLoginSuccess(user) {
+  hideAuthScreen();
+  toast('Privet, ' + (user?.displayName || 'Me') + '!', 'success');
+
+  if (Notification.permission === 'granted') {
+    await ensurePushSubscription();
+  }
+  updatePushStatusPill();
+  await updatePermissionUI();
+  await syncAllReminders();
+  render();
+}
+
+function renderAccountSection() {
+  const box = document.getElementById('settings-account');
+  if (!box) return;
+  if (!state.user) { box.hidden = true; return; }
+  box.hidden = false;
+  const nameEl = document.getElementById('settings-user-name');
+  const subEl = document.getElementById('settings-user-sub');
+  if (nameEl) nameEl.textContent = state.user.displayName || 'Me';
+  if (subEl) subEl.textContent = 'ID: ' + (state.user.id || '').slice(0, 12) + '...';
+}
+
+async function logoutCurrentUser() {
+  try {
+    if (state.sessionToken) await api('/api/auth/logout', { method: 'POST', body: {} });
+  } catch {}
+  await clearSession();
+  // Ochistim lokal'nye reminder'y (chuzhoy account mozhet voyti na etom device)
+  try {
+    await db.clear();
+  } catch {}
+  state.reminders = [];
+  render();
 }
 
 // ============================================================================
@@ -364,10 +719,54 @@ async function syncAckToBackend(reminderId, action = 'done', minutes = 10) {
 
 async function syncAllReminders() {
   if (!state.workerUrl || state.syncing) return;
+  if (!state.sessionToken) return;
   state.syncing = true;
   try {
+    // 1) Pull from server (vse user reminder'y so vsekh device'ev)
+    try {
+      const resp = await api('/api/reminders', { method: 'GET' });
+      const serverRems = Array.isArray(resp?.reminders) ? resp.reminders : [];
+      const byId = new Map();
+      for (const s of serverRems) {
+        byId.set(s.id, {
+          id: s.id,
+          title: s.title,
+          note: s.note || '',
+          fireAt: Number(s.fire_at),
+          repeat: s.repeat || 'none',
+          tone: s.tone || 'friendly',
+          acked: s.status === 'acked' || !!s.acked_at,
+          updatedAt: Number(s.updated_at) || Date.now(),
+          createdAt: Number(s.created_at) || Date.now(),
+        });
+      }
+
+      const localAll = await db.getAll();
+      const localById = new Map(localAll.map((r) => [r.id, r]));
+
+      // Mergiaem: server = truth dlya chuzhikh device'ev. Lokalno — svezhee po updatedAt.
+      for (const [id, sRem] of byId) {
+        const local = localById.get(id);
+        if (!local || (local.updatedAt || 0) < sRem.updatedAt) {
+          await db.put(sRem);
+        }
+      }
+      // Udalyaem lokalnye reminder'y, kotorykh bolshe net na servere (udaleno s drugogo ustr.)
+      for (const l of localAll) {
+        if (!byId.has(l.id)) {
+          await db.delete(l.id);
+        }
+      }
+      state.reminders = (await db.getAll()) || [];
+      state.reminders.sort((a, b) => a.fireAt - b.fireAt);
+      render();
+    } catch (err) {
+      console.warn('sync pull failed', err);
+    }
+
+    // 2) Push local (dlya noviklyx reminder'ev, sozdannykh offline)
     for (const r of state.reminders) {
-      await syncReminderToBackend(r);
+      try { await syncReminderToBackend(r); } catch {}
     }
   } finally {
     state.syncing = false;
@@ -720,6 +1119,7 @@ async function openSettings() {
   settingsWorkerUrl.value = state.workerUrl || '';
   settingsStatus.textContent = '';
   settingsStatus.className = '';
+  renderAccountSection();
   if (settingsDialog.showModal) settingsDialog.showModal();
   else settingsDialog.hidden = false;
 }
@@ -1171,6 +1571,35 @@ function bindEvents() {
     });
   }
 
+  const addPasskeyBtn = document.getElementById('add-passkey-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  if (addPasskeyBtn) {
+    addPasskeyBtn.addEventListener('click', async () => {
+      try {
+        await addPasskeyToAccount();
+        toast('Passkey dobavlen \u2713', 'success');
+      } catch (err) {
+        toast('Oshibka: ' + (err?.message || err), 'error');
+      }
+    });
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      if (!confirm('Vyyti iz akkaunta? Lokal\u2019nye reminder\u2019y budut ochishcheny na etom ustroystve (oni sokhranyatsya na servere).')) return;
+      try {
+        if (settingsDialog?.close) settingsDialog.close();
+        else if (settingsDialog) settingsDialog.hidden = true;
+        await logoutCurrentUser();
+        renderAuthScreen();
+        toast('Vyshli iz akkaunta', 'success');
+      } catch (err) {
+        toast('Oshibka: ' + (err?.message || err), 'error');
+      }
+    });
+  }
+
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible') {
       tickUpdate();
@@ -1202,11 +1631,29 @@ function bindEvents() {
   setupSWMessageHandler();
   await load();
   bindEvents();
+  setupAuthScreen();
   setupInstallBanner();
   updatePushStatusPill();
   await updatePermissionUI();
 
-  if (state.workerUrl && Notification.permission === 'granted') {
+  // Proveryayem sessiyu. Yesli est' Worker i token \u2014 proverim na serverе.
+  if (state.workerUrl && state.sessionToken) {
+    try {
+      const me = await api('/api/auth/me', { method: 'GET' });
+      state.user = me.user;
+      await config.set('user', me.user);
+    } catch (err) {
+      if (err?.status === 401) {
+        await clearSession();
+      }
+    }
+  }
+
+  if (!state.sessionToken || !state.user) {
+    renderAuthScreen();
+  }
+
+  if (state.workerUrl && state.sessionToken && Notification.permission === 'granted') {
     await ensurePushSubscription();
     syncAllReminders();
   }

@@ -1,5 +1,17 @@
 import { sendWebPush } from './push.js';
 import { buildPushBody } from './ai.js';
+import {
+  handleRegisterBegin,
+  handleRegisterFinish,
+  handleLoginBegin,
+  handleLoginFinish,
+  handleMe,
+  handleLogout,
+  handleAddPasskeyBegin,
+  handleAddPasskeyFinish,
+  handleRemovePasskey,
+  getUserFromRequest,
+} from './auth.js';
 
 // ============================================================================
 // Glavnyy Worker entry point
@@ -37,10 +49,19 @@ function corsHeaders(request, env) {
   return {
     'Access-Control-Allow-Origin': ok ? origin || '*' : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Device-Id',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Device-Id, Authorization',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
+}
+
+// Helper dlya auth-endpointov: vyzyvayet handler i zavorachivaet v JSON response.
+async function authRoute(handlerFn, request, env) {
+  const result = await handlerFn(request, env);
+  if (result?.error) {
+    return jsonResponse({ error: result.error }, result.status || 400, request, env);
+  }
+  return jsonResponse(result, 200, request, env);
 }
 
 function jsonResponse(data, status = 200, request = null, env = null) {
@@ -64,6 +85,7 @@ async function handleRequest(request, env, ctx) {
 
   const path = url.pathname.replace(/\/+$/, '') || '/';
 
+  // ---- PUBLIC ----
   if (path === '/api/health') {
     return jsonResponse({ ok: true, ts: Date.now() }, 200, request, env);
   }
@@ -75,49 +97,94 @@ async function handleRequest(request, env, ctx) {
     return jsonResponse({ publicKey: env.VAPID_PUBLIC_KEY }, 200, request, env);
   }
 
+  // ---- AUTH (publichnye) ----
+  if (path === '/api/auth/register/begin' && method === 'POST') {
+    return authRoute(handleRegisterBegin, request, env);
+  }
+  if (path === '/api/auth/register/finish' && method === 'POST') {
+    return authRoute(handleRegisterFinish, request, env);
+  }
+  if (path === '/api/auth/login/begin' && method === 'POST') {
+    return authRoute(handleLoginBegin, request, env);
+  }
+  if (path === '/api/auth/login/finish' && method === 'POST') {
+    return authRoute(handleLoginFinish, request, env);
+  }
+
+  // ---- AUTH (trebuyut session) ----
+  if (path === '/api/auth/me' && method === 'GET') {
+    return authRoute(handleMe, request, env);
+  }
+  if (path === '/api/auth/logout' && method === 'POST') {
+    return authRoute(handleLogout, request, env);
+  }
+  if (path === '/api/auth/passkey/add/begin' && method === 'POST') {
+    return authRoute(handleAddPasskeyBegin, request, env);
+  }
+  if (path === '/api/auth/passkey/add/finish' && method === 'POST') {
+    return authRoute(handleAddPasskeyFinish, request, env);
+  }
+  const rmPasskeyMatch = path.match(/^\/api\/auth\/passkey\/([A-Za-z0-9_\-]+)$/);
+  if (rmPasskeyMatch && method === 'DELETE') {
+    return authRoute((r, e) => handleRemovePasskey(r, e, rmPasskeyMatch[1]), request, env);
+  }
+
+  // ---- Zashchischennye endpointy: trebuyem session ----
+  const user = await getUserFromRequest(env, request);
+
   if (path === '/api/subscribe' && method === 'POST') {
-    return handleSubscribe(request, env);
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleSubscribe(request, env, user);
   }
-
   if (path === '/api/unsubscribe' && method === 'POST') {
-    return handleUnsubscribe(request, env);
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleUnsubscribe(request, env, user);
   }
-
   if (path === '/api/reminders' && method === 'GET') {
-    return handleListReminders(request, env);
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleListReminders(request, env, user);
   }
-
   if (path === '/api/reminders' && method === 'POST') {
-    return handleUpsertReminder(request, env);
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleUpsertReminder(request, env, user);
   }
-
   const reminderMatch = path.match(/^\/api\/reminders\/([a-zA-Z0-9_-]+)$/);
   if (reminderMatch && method === 'DELETE') {
-    return handleDeleteReminder(request, env, reminderMatch[1]);
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleDeleteReminder(request, env, reminderMatch[1], user);
   }
-
   if (path === '/api/ack' && method === 'POST') {
-    return handleAck(request, env);
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleAck(request, env, user);
   }
-
   if (path === '/api/test-push' && method === 'POST') {
-    return handleTestPush(request, env, ctx);
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleTestPush(request, env, ctx, user);
   }
 
   if (path === '/' || path === '/api') {
     return jsonResponse({
       name: 'push.az-worker',
-      version: '1.0.0',
+      version: '1.1.0',
       endpoints: [
-        'GET  /api/health',
-        'GET  /api/vapid-public-key',
-        'POST /api/subscribe',
-        'POST /api/unsubscribe',
-        'GET  /api/reminders',
-        'POST /api/reminders',
+        'GET    /api/health',
+        'GET    /api/vapid-public-key',
+        'POST   /api/auth/register/begin',
+        'POST   /api/auth/register/finish',
+        'POST   /api/auth/login/begin',
+        'POST   /api/auth/login/finish',
+        'GET    /api/auth/me',
+        'POST   /api/auth/logout',
+        'POST   /api/auth/passkey/add/begin',
+        'POST   /api/auth/passkey/add/finish',
+        'DELETE /api/auth/passkey/:id',
+        'POST   /api/subscribe',
+        'POST   /api/unsubscribe',
+        'GET    /api/reminders',
+        'POST   /api/reminders',
         'DELETE /api/reminders/:id',
-        'POST /api/ack',
-        'POST /api/test-push',
+        'POST   /api/ack',
+        'POST   /api/test-push',
       ],
     }, 200, request, env);
   }
@@ -139,7 +206,7 @@ function getDeviceId(request) {
 // /api/subscribe — sokhranyayem push subscription
 // ============================================================================
 
-async function handleSubscribe(request, env) {
+async function handleSubscribe(request, env, user) {
   const deviceId = getDeviceId(request);
   if (!deviceId) return jsonResponse({ error: 'X-Device-Id header required' }, 400, request, env);
 
@@ -157,9 +224,10 @@ async function handleSubscribe(request, env) {
 
   const now = Date.now();
   await env.DB.prepare(
-    `INSERT INTO devices (id, endpoint, p256dh, auth, user_agent, created_at, last_seen_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+    `INSERT INTO devices (id, user_id, endpoint, p256dh, auth, user_agent, created_at, last_seen_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
      ON CONFLICT(id) DO UPDATE SET
+       user_id = excluded.user_id,
        endpoint = excluded.endpoint,
        p256dh = excluded.p256dh,
        auth = excluded.auth,
@@ -169,6 +237,7 @@ async function handleSubscribe(request, env) {
   )
     .bind(
       deviceId,
+      user.userId,
       sub.endpoint,
       sub.keys.p256dh,
       sub.keys.auth,
@@ -180,10 +249,14 @@ async function handleSubscribe(request, env) {
   return jsonResponse({ ok: true, deviceId }, 200, request, env);
 }
 
-async function handleUnsubscribe(request, env) {
+async function handleUnsubscribe(request, env, user) {
   const deviceId = getDeviceId(request);
   if (!deviceId) return jsonResponse({ error: 'X-Device-Id header required' }, 400, request, env);
-  await env.DB.prepare(`UPDATE devices SET revoked_at = ?1 WHERE id = ?2`).bind(Date.now(), deviceId).run();
+  await env.DB.prepare(
+    `UPDATE devices SET revoked_at = ?1 WHERE id = ?2 AND user_id = ?3`,
+  )
+    .bind(Date.now(), deviceId, user.userId)
+    .run();
   return jsonResponse({ ok: true }, 200, request, env);
 }
 
@@ -191,23 +264,19 @@ async function handleUnsubscribe(request, env) {
 // /api/reminders — CRUD
 // ============================================================================
 
-async function handleListReminders(request, env) {
-  const deviceId = getDeviceId(request);
-  if (!deviceId) return jsonResponse({ error: 'X-Device-Id header required' }, 400, request, env);
-
+async function handleListReminders(request, env, user) {
   const rows = await env.DB.prepare(
     `SELECT id, title, note, fire_at, repeat, tone, status, send_count, last_sent_at, acked_at, created_at, updated_at
-     FROM reminders WHERE device_id = ?1 ORDER BY fire_at ASC`,
+     FROM reminders WHERE user_id = ?1 AND status != 'cancelled' ORDER BY fire_at ASC`,
   )
-    .bind(deviceId)
+    .bind(user.userId)
     .all();
 
   return jsonResponse({ reminders: rows.results || [] }, 200, request, env);
 }
 
-async function handleUpsertReminder(request, env) {
-  const deviceId = getDeviceId(request);
-  if (!deviceId) return jsonResponse({ error: 'X-Device-Id header required' }, 400, request, env);
+async function handleUpsertReminder(request, env, user) {
+  const deviceId = getDeviceId(request) || user.deviceId || 'sess-' + user.sessionId.slice(0, 8);
 
   let body;
   try {
@@ -235,12 +304,23 @@ async function handleUpsertReminder(request, env) {
     return jsonResponse({ error: 'invalid tone' }, 400, request, env);
   }
 
+  // Yesli updateim — proverim vladel'tsa
+  const existing = await env.DB.prepare(
+    `SELECT user_id FROM reminders WHERE id = ?1`,
+  )
+    .bind(id)
+    .first();
+  if (existing && existing.user_id && existing.user_id !== user.userId) {
+    return jsonResponse({ error: 'forbidden' }, 403, request, env);
+  }
+
   const now = Date.now();
   await env.DB.prepare(
     `INSERT INTO reminders
-      (id, device_id, title, note, fire_at, repeat, tone, status, send_count, next_attempt_at, created_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', 0, ?5, ?8, ?8)
+      (id, user_id, device_id, title, note, fire_at, repeat, tone, status, send_count, next_attempt_at, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', 0, ?6, ?9, ?9)
      ON CONFLICT(id) DO UPDATE SET
+       user_id = excluded.user_id,
        title = excluded.title,
        note = excluded.note,
        fire_at = excluded.fire_at,
@@ -253,17 +333,18 @@ async function handleUpsertReminder(request, env) {
        acked_at = NULL,
        updated_at = excluded.updated_at`,
   )
-    .bind(id, deviceId, title, note, fireAt, repeat, tone, now)
+    .bind(id, user.userId, deviceId, title, note, fireAt, repeat, tone, now)
     .run();
 
   return jsonResponse({ ok: true, id }, 200, request, env);
 }
 
-async function handleDeleteReminder(request, env, id) {
-  const deviceId = getDeviceId(request);
-  if (!deviceId) return jsonResponse({ error: 'X-Device-Id header required' }, 400, request, env);
-
-  await env.DB.prepare(`DELETE FROM reminders WHERE id = ?1 AND device_id = ?2`).bind(id, deviceId).run();
+async function handleDeleteReminder(request, env, id, user) {
+  await env.DB.prepare(
+    `DELETE FROM reminders WHERE id = ?1 AND user_id = ?2`,
+  )
+    .bind(id, user.userId)
+    .run();
   return jsonResponse({ ok: true }, 200, request, env);
 }
 
@@ -271,10 +352,7 @@ async function handleDeleteReminder(request, env, id) {
 // /api/ack — pol'zovatel' nazhal "Gotovo"
 // ============================================================================
 
-async function handleAck(request, env) {
-  const deviceId = getDeviceId(request);
-  if (!deviceId) return jsonResponse({ error: 'X-Device-Id header required' }, 400, request, env);
-
+async function handleAck(request, env, user) {
   let body;
   try {
     body = await request.json();
@@ -286,9 +364,9 @@ async function handleAck(request, env) {
   if (!reminderId) return jsonResponse({ error: 'reminderId required' }, 400, request, env);
 
   const reminder = await env.DB.prepare(
-    `SELECT * FROM reminders WHERE id = ?1 AND device_id = ?2`,
+    `SELECT * FROM reminders WHERE id = ?1 AND user_id = ?2`,
   )
-    .bind(reminderId, deviceId)
+    .bind(reminderId, user.userId)
     .first();
 
   if (!reminder) return jsonResponse({ error: 'reminder not found' }, 404, request, env);
@@ -333,47 +411,58 @@ async function handleAck(request, env) {
 // /api/test-push — shlyot test-push na ustroystvo (dlya proverki)
 // ============================================================================
 
-async function handleTestPush(request, env, ctx) {
-  const deviceId = getDeviceId(request);
-  if (!deviceId) return jsonResponse({ error: 'X-Device-Id header required' }, 400, request, env);
-
-  const device = await env.DB.prepare(
-    `SELECT * FROM devices WHERE id = ?1 AND revoked_at IS NULL`,
+async function handleTestPush(request, env, ctx, user) {
+  // Shlyot na vse aktivnye device'y polzovatelya
+  const devices = await env.DB.prepare(
+    `SELECT * FROM devices WHERE user_id = ?1 AND revoked_at IS NULL`,
   )
-    .bind(deviceId)
-    .first();
+    .bind(user.userId)
+    .all();
 
-  if (!device) return jsonResponse({ error: 'device not found' }, 404, request, env);
+  const list = devices.results || [];
+  if (!list.length) return jsonResponse({ error: 'no subscribed devices' }, 404, request, env);
 
   const vapid = getVapidConfig(env);
   if (!vapid) return jsonResponse({ error: 'VAPID not configured' }, 500, request, env);
 
   const testReminder = { id: 'test', title: 'Test push.az', note: '', tone: 'friendly' };
-  // Dlya test-pusha srazu pokazyvayem challenge chtoby protestit' funktsiyu
   const built = await buildPushBody(env, testReminder, 2);
-  const pendingCount = await countPendingReminders(env, deviceId);
+  const pendingCount = await countPendingRemindersForUser(env, user.userId);
 
-  const result = await sendWebPush(
-    {
-      endpoint: device.endpoint,
-      p256dh: device.p256dh,
-      auth: device.auth,
-    },
-    {
-      type: 'test',
-      title: 'push.az',
-      body: built.text,
-      challenge: built.challenge,
-      reminderId: 'test',
-      pendingCount,
-    },
-    vapid,
-  );
+  let ok = true;
+  for (const d of list) {
+    const result = await sendWebPush(
+      { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
+      {
+        type: 'test',
+        title: 'push.az',
+        body: built.text,
+        reminderId: 'test',
+        pendingCount,
+      },
+      vapid,
+    );
+    if (!result.ok) ok = false;
+  }
 
-  return jsonResponse({ ok: result.ok, status: result.status, body: built.text, challenge: built.challenge }, result.ok ? 200 : 502, request, env);
+  return jsonResponse({ ok, body: built.text, devices: list.length }, ok ? 200 : 502, request, env);
 }
 
-async function countPendingReminders(env, deviceId) {
+async function countPendingRemindersForUser(env, userId) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM reminders
+       WHERE user_id = ?1 AND status = 'active' AND fire_at <= ?2`,
+    )
+      .bind(userId, Date.now())
+      .first();
+    return Number(row?.c || 0);
+  } catch {
+    return 0;
+  }
+}
+
+async function countPendingRemindersForDevice(env, deviceId) {
   try {
     const row = await env.DB.prepare(
       `SELECT COUNT(*) AS c FROM reminders
@@ -404,12 +493,10 @@ async function runScheduler(env) {
 
   const now = Date.now();
   const dueRows = await env.DB.prepare(
-    `SELECT r.*, d.endpoint, d.p256dh, d.auth, d.revoked_at AS device_revoked
-     FROM reminders r
-     JOIN devices d ON d.id = r.device_id
-     WHERE r.status = 'active'
-       AND r.next_attempt_at <= ?1
-       AND (d.revoked_at IS NULL)
+    `SELECT * FROM reminders
+     WHERE status = 'active'
+       AND next_attempt_at <= ?1
+       AND user_id IS NOT NULL
      LIMIT 200`,
   )
     .bind(now)
@@ -441,51 +528,81 @@ async function processOneReminder(env, r, vapid, now) {
     return;
   }
 
-  const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone };
-  const built = await buildPushBody(env, reminder, attempt);
-  const pendingCount = await countPendingReminders(env, r.device_id);
-
-  const result = await sendWebPush(
-    { endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth },
-    {
-      type: 'reminder',
-      reminderId: r.id,
-      title: r.title,
-      body: built.text,
-      challenge: built.challenge,
-      attempt,
-      maxAttempts: MAX_ATTEMPTS,
-      fireAt: r.fire_at,
-      tone: r.tone,
-      pendingCount,
-    },
-    vapid,
-    { ttl: 60, urgency: 'high', topic: 'r-' + r.id },
-  );
-
-  await env.DB.prepare(
-    `INSERT INTO push_log (reminder_id, device_id, sent_at, attempt, body, status, error)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+  // Nakhodim vse aktivnye device'y polzovatelya
+  const devicesRows = await env.DB.prepare(
+    `SELECT * FROM devices WHERE user_id = ?1 AND revoked_at IS NULL`,
   )
-    .bind(
-      r.id,
-      r.device_id,
-      now,
-      attempt,
-      built.text,
-      result.status,
-      result.ok ? null : String(result.body || '').slice(0, 500),
-    )
-    .run();
+    .bind(r.user_id)
+    .all();
+  const devices = devicesRows.results || [];
 
-  if (result.gone) {
-    await env.DB.prepare(`UPDATE devices SET revoked_at = ?1 WHERE id = ?2`)
-      .bind(now, r.device_id)
+  if (!devices.length) {
+    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
+    await env.DB.prepare(
+      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+    )
+      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
       .run();
     return;
   }
 
-  if (!result.ok) {
+  const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone };
+  const built = await buildPushBody(env, reminder, attempt);
+  const pendingCount = await countPendingRemindersForUser(env, r.user_id);
+
+  let anyOk = false;
+  let anyNonGoneError = false;
+
+  for (const d of devices) {
+    const result = await sendWebPush(
+      { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
+      {
+        type: 'reminder',
+        reminderId: r.id,
+        title: r.title,
+        body: built.text,
+        attempt,
+        maxAttempts: MAX_ATTEMPTS,
+        fireAt: r.fire_at,
+        tone: r.tone,
+        pendingCount,
+      },
+      vapid,
+      { ttl: 60, urgency: 'high', topic: 'r-' + r.id },
+    );
+
+    await env.DB.prepare(
+      `INSERT INTO push_log (reminder_id, device_id, user_id, sent_at, attempt, body, status, error)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+    )
+      .bind(
+        r.id,
+        d.id,
+        r.user_id,
+        now,
+        attempt,
+        built.text,
+        result.status,
+        result.ok ? null : String(result.body || '').slice(0, 500),
+      )
+      .run();
+
+    if (result.gone) {
+      await env.DB.prepare(`UPDATE devices SET revoked_at = ?1 WHERE id = ?2`)
+        .bind(now, d.id)
+        .run();
+      continue;
+    }
+    if (result.ok) anyOk = true;
+    else anyNonGoneError = true;
+  }
+
+  if (!anyOk && anyNonGoneError) {
+    // Vse popytki v etu iteratsiyu upali — ne prodvigayem schetchik
+    return;
+  }
+  if (!anyOk) {
+    // Vse device'y goneли
     return;
   }
 
