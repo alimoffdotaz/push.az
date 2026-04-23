@@ -1754,21 +1754,28 @@ function bindEvents() {
   const clearMissedBtn = document.getElementById('clear-missed-btn');
   if (clearMissedBtn) {
     clearMissedBtn.addEventListener('click', async () => {
+      console.log('[clear-missed] click', { url: state.workerUrl, hasToken: !!state.sessionToken });
       if (!state.workerUrl || !state.sessionToken) {
         toast('Ne avtorizovan', 'error');
         return;
       }
-      if (!confirm('Gasit\u2019 vse propushchennye reminderы?')) return;
       clearMissedBtn.disabled = true;
+      clearMissedBtn.textContent = 'Ochishchayu\u2026';
       try {
         const res = await api('/api/reminders/clear-missed', { method: 'POST', body: {} });
-        toast('Ochishcheno: ' + (res?.changes || 0), 'success');
-        await syncAllReminders();
+        console.log('[clear-missed] response', res);
+        const n = Number(res?.changes || 0);
+        toast(n > 0 ? 'Ochishcheno: ' + n : 'Propushchennykh ne bylo', 'success');
+        // Zakryt' settings chtoby toast bylo vidno
+        closeSettings();
         hideTakeover();
+        await syncAllReminders();
       } catch (err) {
+        console.error('[clear-missed] error', err);
         toast('Oshibka: ' + (err?.message || err), 'error');
       } finally {
         clearMissedBtn.disabled = false;
+        clearMissedBtn.textContent = 'Ochistit\u2019 propushchennye';
       }
     });
   }
