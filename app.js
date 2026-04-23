@@ -1270,10 +1270,13 @@ async function takeoverConfirmDone() {
   if (!id) return hideTakeover();
   const r = state.reminders.find((x) => x.id === id);
   if (r) {
+    // Vazhno: snachala ack na backend (sinkhrоnно), chtoby server
+    // perevyol status v 'acked' i ne otdaval reminder v syncAllReminders
+    // obratno s overdue fire_at \u2014 inache takeover pokazhetsya snova.
+    try { await syncAckToBackend(id, 'done'); } catch {}
     await db.delete(id);
     state.reminders = state.reminders.filter((x) => x.id !== id);
     await cancelLocalNotification(id);
-    syncAckToBackend(id, 'done');
     render();
     toast('Vypolneno \u2713', 'success');
   }
@@ -1745,6 +1748,28 @@ function bindEvents() {
       if (settingsDialog.close) settingsDialog.close();
       else settingsDialog.hidden = true;
       setTimeout(() => showTakeoverForTest(), 300);
+    });
+  }
+
+  const clearMissedBtn = document.getElementById('clear-missed-btn');
+  if (clearMissedBtn) {
+    clearMissedBtn.addEventListener('click', async () => {
+      if (!state.workerUrl || !state.sessionToken) {
+        toast('Ne avtorizovan', 'error');
+        return;
+      }
+      if (!confirm('Gasit\u2019 vse propushchennye reminderы?')) return;
+      clearMissedBtn.disabled = true;
+      try {
+        const res = await api('/api/reminders/clear-missed', { method: 'POST', body: {} });
+        toast('Ochishcheno: ' + (res?.changes || 0), 'success');
+        await syncAllReminders();
+        hideTakeover();
+      } catch (err) {
+        toast('Oshibka: ' + (err?.message || err), 'error');
+      } finally {
+        clearMissedBtn.disabled = false;
+      }
     });
   }
 

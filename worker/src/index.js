@@ -188,6 +188,10 @@ async function handleRequest(request, env, ctx) {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
     return handleAck(request, env, user);
   }
+  if (path === '/api/reminders/clear-missed' && method === 'POST') {
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    return handleClearMissed(request, env, user);
+  }
   if (path === '/api/test-push' && method === 'POST') {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
     return handleTestPush(request, env, ctx, user);
@@ -311,9 +315,12 @@ async function handleUnsubscribe(request, env, user) {
 // ============================================================================
 
 async function handleListReminders(request, env, user) {
+  // Otdayom tol'ko aktivnye i propushchennye reminderы. 'acked' i 'cancelled'
+  // ostayutsya v DB dlya audita, no klientu ne nuzhny — inache lokalьnaya
+  // sync bzdet vozвращат' ikh i triggerit' takeover posle ack.
   const rows = await env.DB.prepare(
     `SELECT id, title, note, fire_at, repeat, tone, status, send_count, last_sent_at, acked_at, created_at, updated_at
-     FROM reminders WHERE user_id = ?1 AND status != 'cancelled' ORDER BY fire_at ASC`,
+     FROM reminders WHERE user_id = ?1 AND status IN ('active','missed') ORDER BY fire_at ASC`,
   )
     .bind(user.userId)
     .all();
@@ -392,6 +399,19 @@ async function handleDeleteReminder(request, env, id, user) {
     .bind(id, user.userId)
     .run();
   return jsonResponse({ ok: true }, 200, request, env);
+}
+
+// POST /api/reminders/clear-missed \u2014 massovo gasit vse 'missed' reminderы
+// pol'zovatelya. Ispol'zuyetsya dlya ochistki zastryavshikh overdue reminderov.
+async function handleClearMissed(request, env, user) {
+  const now = Date.now();
+  const res = await env.DB.prepare(
+    `UPDATE reminders SET status = 'cancelled', updated_at = ?1
+     WHERE user_id = ?2 AND status = 'missed'`,
+  )
+    .bind(now, user.userId)
+    .run();
+  return jsonResponse({ ok: true, changes: res.meta?.changes || 0 }, 200, request, env);
 }
 
 // ============================================================================
