@@ -56,7 +56,7 @@ function corsHeaders(request, env) {
   return {
     'Access-Control-Allow-Origin': ok ? origin || '*' : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Device-Id, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Device-Id, Authorization, X-Admin-Token',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
