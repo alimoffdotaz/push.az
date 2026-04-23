@@ -720,9 +720,12 @@ async function processOneReminder(env, r, vapid, now) {
         .bind(nextFire, now, r.id)
         .run();
     } else {
+      // Propushchen: ne gasim reminder, a perevodim v 'missed'. Scheduler
+      // ego bolshe ne dyornet (status != 'active'), no /api/reminders otdast,
+      // i pri otkrytii PWA force-takeover zastavit polzovatelya podtverdit'.
       await env.DB.prepare(
         `UPDATE reminders
-         SET status = 'cancelled', send_count = ?1, last_sent_at = ?2, updated_at = ?2
+         SET status = 'missed', send_count = ?1, last_sent_at = ?2, updated_at = ?2
          WHERE id = ?3`,
       )
         .bind(attempt, now, r.id)

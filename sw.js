@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v4';
+const CACHE = 'push-az-v5';
 const ASSETS = [
   '/',
   '/index.html',
@@ -104,18 +104,25 @@ self.addEventListener('push', (event) => {
   const challenge = data.challenge || null;
 
   const urgent = attempt >= 3;
-  const title = (data.title || 'push.az') + (urgent ? ' \u203c' : '');
+  const isFinal = isReminder && attempt >= maxAttempts;
+  let title = data.title || 'push.az';
+  if (isFinal) title = '\ud83d\udea8 POSLEDNIY ZVONOK \u2014 ' + title;
+  else if (urgent) title = title + ' \u203c';
 
   const options = {
     body: data.body || 'Vremya!',
-    icon: urgent ? '/icons/icon-alert-512.png' : '/icons/icon-512.png',
+    icon: urgent || isFinal ? '/icons/icon-alert-512.png' : '/icons/icon-512.png',
     badge: '/icons/icon-192.png',
-    tag: 'push-az-' + (reminderId || 'generic'),
+    // Na finalnoy popytke ne kollapsirovat' s predyduschimi (unikalnyy tag)
+    tag: isFinal
+      ? 'push-az-final-' + (reminderId || 'generic')
+      : 'push-az-' + (reminderId || 'generic'),
     renotify: true,
     requireInteraction: true,
     data: {
       ...data,
       challenge,
+      isFinal,
       receivedAt: Date.now(),
       challengeFailures: 0,
     },
@@ -133,7 +140,13 @@ self.addEventListener('push', (event) => {
   }
 
   if (isReminder) {
-    try { options.vibrate = urgent ? [200, 80, 200, 80, 400] : [100, 40, 100]; } catch {}
+    try {
+      options.vibrate = isFinal
+        ? [300, 100, 300, 100, 300, 100, 600]
+        : urgent
+          ? [200, 80, 200, 80, 400]
+          : [100, 40, 100];
+    } catch {}
     if (attempt > 1) {
       options.body = options.body + ' (' + attempt + '/' + maxAttempts + ')';
     }

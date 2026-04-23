@@ -85,14 +85,21 @@ async function tgEditMessage(env, chatId, messageId, text, extra = {}) {
 const TONE_EMOJI = { friendly: '💜', urgent: '⚡️', funny: '😆', aggressive: '🔥' };
 
 export function formatReminderMessage(reminder, bodyText, attempt, maxAttempts) {
-  const emoji = TONE_EMOJI[reminder.tone] || '🔔';
-  const title = escMd(reminder.title);
+  const isFinal = attempt >= maxAttempts;
+  const emoji = isFinal ? '🚨' : (TONE_EMOJI[reminder.tone] || '🔔');
+  const rawTitle = isFinal
+    ? `POSLEDNIY ZVONOK — ${reminder.title}`
+    : reminder.title;
+  const title = escMd(rawTitle);
   const body = escMd(bodyText);
   const note = reminder.note ? `\n\n_${escMd(reminder.note)}_` : '';
+  const header = isFinal
+    ? `\n\n${escMd('Bolshe pushei ne budet. Otkroy push.az i podtverdi.')}`
+    : '';
   const attemptLine = attempt > 1
     ? `\n\n_${escMd(`Popytka ${attempt}/${maxAttempts}`)}_`
     : '';
-  return `${emoji} *${title}*\n\n${body}${note}${attemptLine}`;
+  return `${emoji} *${title}*\n\n${body}${note}${header}${attemptLine}`;
 }
 
 export function reminderInlineKeyboard(reminderId) {

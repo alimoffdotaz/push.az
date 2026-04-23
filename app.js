@@ -894,6 +894,7 @@ async function syncAllReminders() {
       state.reminders = (await db.getAll()) || [];
       state.reminders.sort((a, b) => a.fireAt - b.fireAt);
       render();
+      checkTakeover();
     } catch (err) {
       console.warn('sync pull failed', err);
     }
@@ -958,9 +959,48 @@ async function updateAppBadge(count) {
   } catch {
     // unsupported \u2014 ignore
   }
-  // Takzhe podgonyaem titul (chtoby v Safari bylo vidno)
   try {
-    document.title = count > 0 ? `(${count}) push.az` : 'push.az';
+    document.title = count > 0 ? `(${count}) \u26a0 push.az \u2014 propuschen` : 'push.az \u2014 Osobyy Reminder';
+  } catch {}
+  updateAlertFavicon(count > 0);
+  updateAlertBodyClass(count > 0);
+}
+
+// Podmenyaem favicon na alert-ikonku kogda yest' propushchennye reminderу.
+// Menyaem href u <link rel="icon"> elementov.
+let _alertFaviconActive = null;
+const _originalFaviconHrefs = new Map();
+function updateAlertFavicon(alert) {
+  if (_alertFaviconActive === alert) return;
+  _alertFaviconActive = alert;
+  try {
+    const links = document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]');
+    links.forEach((link) => {
+      if (!_originalFaviconHrefs.has(link)) {
+        _originalFaviconHrefs.set(link, link.getAttribute('href'));
+      }
+      if (alert) {
+        // Podbor alternativy po tipu
+        const type = (link.getAttribute('type') || '').toLowerCase();
+        const rel = link.getAttribute('rel') || '';
+        if (rel === 'apple-touch-icon') {
+          link.setAttribute('href', '/icons/icon-alert-512.png');
+        } else if (type.includes('svg')) {
+          link.setAttribute('href', '/icons/icon-alert.svg');
+        } else {
+          link.setAttribute('href', '/icons/icon-alert-512.png');
+        }
+      } else {
+        const orig = _originalFaviconHrefs.get(link);
+        if (orig) link.setAttribute('href', orig);
+      }
+    });
+  } catch {}
+}
+
+function updateAlertBodyClass(alert) {
+  try {
+    document.body.classList.toggle('has-overdue', !!alert);
   } catch {}
 }
 
@@ -1131,9 +1171,11 @@ function tickUpdate() {
 function checkTakeover() {
   if (state.takeoverActive) return;
   const now = Date.now();
+  // Forsiruyem takeover dlya vsekh unacked reminders (vklyuchaya repeat),
+  // yesli ikh fire_at proshyol ot 0 do 24 chasov nazad.
   const overdue = state.reminders
-    .filter((r) => r.repeat === 'none')
-    .filter((r) => r.fireAt <= now && (now - r.fireAt) < 6 * 60 * 60 * 1000)
+    .filter((r) => !r.acked)
+    .filter((r) => r.fireAt <= now && (now - r.fireAt) < 24 * 60 * 60 * 1000)
     .sort((a, b) => a.fireAt - b.fireAt);
   if (overdue.length && document.visibilityState === 'visible') {
     showTakeover(overdue[0], overdue.length);
@@ -1741,6 +1783,11 @@ function bindEvents() {
     if (document.visibilityState === 'visible') {
       tickUpdate();
       updatePermissionUI();
+      // Sperva podtyanem svezhiye reminderы s backend'a (vklyuchaya
+      // propushchennye na drugikh ustroystvakh), potom forsiruem takeover.
+      if (state.online && state.workerUrl && state.sessionToken) {
+        try { await syncAllReminders(); } catch {}
+      }
       checkTakeover();
       if (state.workerUrl && Notification.permission === 'granted' && !state.pushSubscribed) {
         await ensurePushSubscription();

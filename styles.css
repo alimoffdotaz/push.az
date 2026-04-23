@@ -79,6 +79,29 @@ a:hover {
   gap: 12px;
 }
 
+/* Alert mode: kogda est' propushchennye reminderы.
+   Shapka prilozheniya migaet krasnym, chtoby ubit' privychku fonovogo
+   vospriyatiya i zastavit' polzovatelya otreagirovat'. */
+body.has-overdue .app-header {
+  position: relative;
+}
+body.has-overdue .app-header::before {
+  content: '';
+  position: absolute;
+  inset: -4px -12px;
+  border-radius: 18px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.22), rgba(244, 63, 94, 0.18));
+  animation: pushAzAlertPulse 1.4s ease-in-out infinite;
+}
+body.has-overdue .brand-text h1 {
+  color: #fecaca;
+}
+@keyframes pushAzAlertPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
 .brand {
   display: flex;
   align-items: center;
