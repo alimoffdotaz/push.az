@@ -311,25 +311,25 @@ export async function generateAIText(ai, reminder, attempt, lang = 'ru') {
 
 const OPEN_HINTS = {
   ru: [
-    'Тап → подтверди в app',
-    'Открой app, чтобы закрыть',
-    'Тап, чтобы завершить',
-    'Подтверди в приложении',
-    'Открой push.az → challenge',
+    'Тап → в app введи первые буквы названия',
+    'Открой push.az — подтверждение по буквам названия',
+    'Тап, чтобы завершить в приложении',
+    'Подтверди в приложении первыми буквами названия',
+    'Открой push.az → ввод букв из названия',
   ],
   az: [
-    'Tap → tətbiqdə təsdiq et',
-    'Bağlamaq üçün tətbiqi aç',
-    'Bitirmək üçün tap et',
-    'Tətbiqdə təsdiqlə',
-    'push.az → challenge',
+    'Tap → tətbiqdə adın ilk hərflərini yaz',
+    'push.az aç — adın hərfləri ilə təsdiq',
+    'Bitirmək üçün tətbiqi aç',
+    'Tətbiqdə başlığın ilk hərfləri ilə təsdiqlə',
+    'push.az → başlıqdakı hərflər',
   ],
   en: [
-    'Tap → confirm in app',
-    'Open app to dismiss',
-    'Tap to complete',
-    'Confirm in the app',
-    'Open push.az → challenge',
+    'Tap → type first letters of the title in the app',
+    'Open push.az — confirm with letters from the title',
+    'Tap to finish in the app',
+    'Confirm in the app using the first letters of the title',
+    'Open push.az → type letters from the title',
   ],
 };
 

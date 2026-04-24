@@ -113,7 +113,11 @@ const DICT = {
     'takeover.challenge.2': 'Чтобы подтвердить — нажми <strong>{n}</strong>',
     'takeover.challenge.3': 'Прочёл? Нажми <strong>{n}</strong>',
     'takeover.challenge.4': 'Цифра <strong>{n}</strong> — и свободен',
-    'takeover.wrong': 'Не та. Прочти внимательно.',
+    'takeover.challenge_letters_html':
+      'Введи первые <strong>{n}</strong> буквы <strong>названия</strong> задачи (без пробелов, регистр не важен).',
+    'takeover.challenge_confirm': 'Подтвердить',
+    'takeover.challenge_input_aria': 'Первые буквы названия напоминания',
+    'takeover.wrong': 'Не то. Прочти название и попробуй снова.',
 
     // Settings
     'settings.title': 'Настройки',
@@ -307,7 +311,11 @@ const DICT = {
     'takeover.challenge.2': 'Təsdiq üçün — <strong>{n}</strong>-ə tap',
     'takeover.challenge.3': 'Oxudun? <strong>{n}</strong>-ə bas',
     'takeover.challenge.4': 'Rəqəm <strong>{n}</strong> — azadsan',
-    'takeover.wrong': 'Yox. Diqqətlə oxu.',
+    'takeover.challenge_letters_html':
+      'Tapşırığın <strong>adının</strong> ilk <strong>{n}</strong> hərfini yaz (boşluqsuz, böyük/kiçik fərq etmir).',
+    'takeover.challenge_confirm': 'Təsdiqlə',
+    'takeover.challenge_input_aria': 'Tapşırıq adının ilk hərfləri',
+    'takeover.wrong': 'Yox. Adı diqqətlə oxu və yenidən yoxla.',
 
     'settings.title': 'Parametrlər',
     'settings.lang': 'Dil',
@@ -490,7 +498,11 @@ const DICT = {
     'takeover.challenge.2': 'To confirm — tap <strong>{n}</strong>',
     'takeover.challenge.3': 'Read it? Tap <strong>{n}</strong>',
     'takeover.challenge.4': 'Digit <strong>{n}</strong> — and you are free',
-    'takeover.wrong': 'Wrong. Read carefully.',
+    'takeover.challenge_letters_html':
+      'Type the first <strong>{n}</strong> letters of the task <strong>title</strong> (no spaces, case does not matter).',
+    'takeover.challenge_confirm': 'Confirm',
+    'takeover.challenge_input_aria': 'First letters of the reminder title',
+    'takeover.wrong': 'Not quite. Read the title and try again.',
 
     'settings.title': 'Settings',
     'settings.lang': 'Language',

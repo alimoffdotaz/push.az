@@ -1310,8 +1310,40 @@ function hideTakeover() {
   setTimeout(() => checkTakeover(), 400);
 }
 
-// Challenge: 3 knopki, odnu pravil'naya
-function generateChallenge() {
+const CHALLENGE_LETTER_COUNT = 3;
+
+/** Pervyye N bukv iz nazvaniya (Unicode \p{L}), lower case. Pustaya stroka esli bukv net. */
+function letterAnswerFromTitle(title) {
+  const out = [];
+  for (const ch of String(title || '').normalize('NFC').trim()) {
+    if (/\p{L}/u.test(ch)) out.push(ch.toLocaleLowerCase('und'));
+    if (out.length >= CHALLENGE_LETTER_COUNT) break;
+  }
+  if (out.length === 0) return null;
+  return out.join('');
+}
+
+/** Iz vvoda polzovatelya — tol'ko bukvy, ne boleye maxLen. */
+function letterPrefixFromUserInput(raw, maxLen) {
+  const out = [];
+  for (const ch of String(raw || '').normalize('NFC')) {
+    if (/\p{L}/u.test(ch)) out.push(ch.toLocaleLowerCase('und'));
+    if (out.length >= maxLen) break;
+  }
+  return out.join('');
+}
+
+function setTakeoverChallengeHint(wrongAttempt) {
+  if (wrongAttempt) {
+    takeoverChallengeHint.textContent = t('takeover.wrong');
+    takeoverChallengeHint.hidden = false;
+  } else {
+    takeoverChallengeHint.hidden = true;
+  }
+}
+
+// Zapas: 3 knopki s tsiframi, odna pravil'naya (yesli v nazvanii net bukv)
+function generateDigitChallenge() {
   const digits = [2, 3, 4, 5, 6, 7, 8, 9];
   const pool = digits.slice();
   const picks = [];
@@ -1323,14 +1355,17 @@ function generateChallenge() {
   return { buttons: picks, correct };
 }
 
-function renderChallenge(wrongAttempt) {
-  const ch = generateChallenge();
+function renderDigitChallenge(wrongAttempt) {
+  takeoverEl.dataset.challengeMode = 'digits';
+  delete takeoverEl.dataset.challengeAnswer;
+  const ch = generateDigitChallenge();
   takeoverEl.dataset.correctDigit = String(ch.correct);
 
   const promptKeys = ['takeover.challenge.1', 'takeover.challenge.2', 'takeover.challenge.3', 'takeover.challenge.4'];
   const key = promptKeys[Math.floor(Math.random() * promptKeys.length)];
   takeoverChallengePrompt.innerHTML = t(key, { n: ch.correct });
 
+  takeoverChallengeButtons.className = 'takeover-challenge-buttons';
   takeoverChallengeButtons.innerHTML = '';
   ch.buttons.forEach((d) => {
     const btn = document.createElement('button');
@@ -1338,19 +1373,82 @@ function renderChallenge(wrongAttempt) {
     btn.className = 'takeover-challenge-btn';
     btn.textContent = String(d);
     btn.dataset.digit = String(d);
-    btn.addEventListener('click', () => handleChallengeTap(d, btn));
+    btn.addEventListener('click', () => handleDigitChallengeTap(d, btn));
     takeoverChallengeButtons.appendChild(btn);
   });
 
-  if (wrongAttempt) {
-    takeoverChallengeHint.textContent = t('takeover.wrong');
-    takeoverChallengeHint.hidden = false;
-  } else {
-    takeoverChallengeHint.hidden = true;
-  }
+  setTakeoverChallengeHint(wrongAttempt);
 }
 
-async function handleChallengeTap(digit, btnEl) {
+function renderLetterChallenge(title, wrongAttempt) {
+  const answer = letterAnswerFromTitle(title);
+  if (!answer) {
+    renderDigitChallenge(wrongAttempt);
+    return;
+  }
+  takeoverEl.dataset.challengeMode = 'letters';
+  takeoverEl.dataset.challengeAnswer = answer;
+  delete takeoverEl.dataset.correctDigit;
+
+  takeoverChallengePrompt.innerHTML = t('takeover.challenge_letters_html', { n: answer.length });
+  takeoverChallengeButtons.className = 'takeover-challenge-buttons takeover-challenge-form';
+  takeoverChallengeButtons.innerHTML = '';
+
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'takeover-challenge-input';
+  inp.setAttribute('inputmode', 'text');
+  inp.setAttribute('enterkeyhint', 'done');
+  inp.setAttribute('autocomplete', 'off');
+  inp.setAttribute('autocorrect', 'off');
+  inp.setAttribute('spellcheck', 'false');
+  inp.setAttribute('aria-label', t('takeover.challenge_input_aria'));
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-primary takeover-challenge-submit';
+  btn.textContent = t('takeover.challenge_confirm');
+
+  takeoverChallengeButtons.appendChild(inp);
+  takeoverChallengeButtons.appendChild(btn);
+
+  const tryLetters = async () => {
+    const guess = letterPrefixFromUserInput(inp.value, answer.length);
+    if (guess === answer) {
+      if (navigator.vibrate) { try { navigator.vibrate(60); } catch {} }
+      await takeoverConfirmDone();
+      return;
+    }
+    inp.classList.add('takeover-challenge-input-wrong');
+    if (navigator.vibrate) { try { navigator.vibrate([200, 80, 200]); } catch {} }
+    setTimeout(() => inp.classList.remove('takeover-challenge-input-wrong'), 400);
+    inp.value = '';
+    setTakeoverChallengeHint(true);
+    inp.focus();
+  };
+
+  btn.addEventListener('click', () => { tryLetters(); });
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      tryLetters();
+    }
+  });
+
+  setTakeoverChallengeHint(wrongAttempt);
+  requestAnimationFrame(() => {
+    try { inp.focus(); } catch {}
+  });
+}
+
+function renderChallenge(wrongAttempt) {
+  const rid = takeoverEl.dataset.reminderId;
+  const r = state.reminders.find((x) => x.id === rid);
+  const title = r?.title || '';
+  renderLetterChallenge(title, wrongAttempt);
+}
+
+async function handleDigitChallengeTap(digit, btnEl) {
   const correct = Number(takeoverEl.dataset.correctDigit);
   if (digit === correct) {
     btnEl.classList.add('correct');
