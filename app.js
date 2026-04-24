@@ -740,6 +740,7 @@ async function logoutCurrentUser() {
   try {
     if (state.sessionToken) await api('/api/auth/logout', { method: 'POST', body: {} });
   } catch {}
+  state.pushSubscribed = false;
   await clearSession();
   // Ochistim lokal'nye reminder'y (chuzhoy account mozhet voyti na etom device)
   try {
@@ -1771,19 +1772,23 @@ function bindEvents() {
   }
 
   document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState === 'visible') {
-      tickUpdate();
-      updatePermissionUI();
-      // Sperva podtyanem svezhiye reminderы s backend'a (vklyuchaya
-      // propushchennye na drugikh ustroystvakh), potom forsiruem takeover.
-      if (state.online && state.workerUrl && state.sessionToken) {
-        try { await syncAllReminders(); } catch {}
-      }
-      checkTakeover();
-      if (state.workerUrl && Notification.permission === 'granted' && !state.pushSubscribed) {
+    if (document.visibilityState !== 'visible') return;
+    tickUpdate();
+    updatePermissionUI();
+    // Sperva podtyanem svezhiye reminderы s backend'a (vklyuchaya
+    // propushchennye na drugikh ustroystvakh), potom forsiruem takeover.
+    if (state.online && state.workerUrl && state.sessionToken) {
+      try { await syncAllReminders(); } catch {}
+    }
+    checkTakeover();
+    if (state.workerUrl && Notification.permission === 'granted' && !state.pushSubscribed) {
+      try {
         await ensurePushSubscription();
+      } catch (err) {
+        console.warn('ensurePushSubscription', err);
       }
     }
+    await updatePermissionUI();
   });
 
   window.addEventListener('online', () => {
@@ -1830,7 +1835,12 @@ function bindEvents() {
   }
 
   if (state.workerUrl && state.sessionToken && Notification.permission === 'granted') {
-    await ensurePushSubscription();
+    try {
+      await ensurePushSubscription();
+    } catch (err) {
+      console.warn('ensurePushSubscription', err);
+    }
+    await updatePermissionUI();
     syncAllReminders();
   }
 
