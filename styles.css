@@ -1315,6 +1315,12 @@ body.has-overdue .brand-text h1 {
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
 }
+/* Author `display:flex` wins over UA `[hidden]` in WebKit without this. */
+.settings-tg-code[hidden],
+.settings-tg-linked[hidden],
+.settings-tg-empty[hidden] {
+  display: none !important;
+}
 .settings-tg-code-label { color: var(--text-dim); font-size: 12px; }
 .settings-tg-code-value {
   font-family: ui-monospace, SF Mono, Menlo, monospace;
