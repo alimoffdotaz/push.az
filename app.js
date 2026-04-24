@@ -612,10 +612,19 @@ async function renderTelegramSection() {
   const codeBlock = document.getElementById('settings-tg-code');
   const linked = document.getElementById('settings-tg-linked');
 
+  const hintEl = document.getElementById('settings-tg-hint');
+  const chipEl = document.getElementById('settings-tg-chip');
+
+  const setTgPromoVisible = (visible) => {
+    if (hintEl) hintEl.hidden = !visible;
+    if (chipEl) chipEl.hidden = !visible;
+  };
+
   if (tgLinkCurrentCode) {
     if (empty) empty.hidden = true;
     if (linked) linked.hidden = true;
     if (codeBlock) codeBlock.hidden = false;
+    setTgPromoVisible(false);
     return;
   }
 
@@ -627,14 +636,17 @@ async function renderTelegramSection() {
       if (empty) empty.hidden = true;
       if (codeBlock) codeBlock.hidden = true;
       if (linked) linked.hidden = false;
+      setTgPromoVisible(false);
       renderTgLinksList(links);
     } else {
       if (empty) empty.hidden = false;
       if (codeBlock) codeBlock.hidden = true;
       if (linked) linked.hidden = true;
+      setTgPromoVisible(true);
     }
   } catch (err) {
     if (empty) empty.hidden = false;
+    setTgPromoVisible(true);
   }
 }
 
@@ -675,9 +687,6 @@ async function startTelegramLink() {
   try {
     const resp = await api('/api/telegram/link/begin', { method: 'POST', body: {} });
     tgLinkCurrentCode = resp.code;
-    const empty = document.getElementById('settings-tg-empty');
-    const linked = document.getElementById('settings-tg-linked');
-    const codeBlock = document.getElementById('settings-tg-code');
     const codeValue = document.getElementById('tg-code-value');
     const deepLink = document.getElementById('tg-deep-link');
     const botName = document.getElementById('tg-bot-username');
@@ -688,9 +697,7 @@ async function startTelegramLink() {
     if (botName) botName.textContent = '@' + (resp.botUsername || 'push_az_bot');
     if (cmd) cmd.textContent = '/link ' + resp.code;
 
-    if (empty) empty.hidden = true;
-    if (linked) linked.hidden = true;
-    if (codeBlock) codeBlock.hidden = false;
+    await renderTelegramSection();
   } catch (err) {
     toast(t('err.generic', { err: err?.message || err }), 'error');
   }
