@@ -192,10 +192,6 @@ async function handleRequest(request, env, ctx) {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
     return handleAck(request, env, user);
   }
-  if (path === '/api/reminders/clear-missed' && method === 'POST') {
-    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
-    return handleClearMissed(request, env, user);
-  }
   // Telegram (authenticated)
   if (path === '/api/telegram/link/begin' && method === 'POST') {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
@@ -398,19 +394,6 @@ async function handleDeleteReminder(request, env, id, user) {
     .bind(id, user.userId)
     .run();
   return jsonResponse({ ok: true }, 200, request, env);
-}
-
-// POST /api/reminders/clear-missed \u2014 massovo gasit vse 'missed' reminderы
-// pol'zovatelya. Ispol'zuyetsya dlya ochistki zastryavshikh overdue reminderov.
-async function handleClearMissed(request, env, user) {
-  const now = Date.now();
-  const res = await env.DB.prepare(
-    `UPDATE reminders SET status = 'cancelled', updated_at = ?1
-     WHERE user_id = ?2 AND status = 'missed'`,
-  )
-    .bind(now, user.userId)
-    .run();
-  return jsonResponse({ ok: true, changes: res.meta?.changes || 0 }, 200, request, env);
 }
 
 // ============================================================================

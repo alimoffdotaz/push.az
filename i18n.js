@@ -117,10 +117,7 @@ const DICT = {
 
     // Settings
     'settings.title': 'Настройки',
-    'settings.worker_url': 'Cloudflare Worker URL',
-    'settings.worker_hint': 'Без URL приложение работает локально — пуш будет приходить только пока открыто приложение.',
     'settings.lang': 'Язык',
-    'settings.clear_missed': 'Очистить пропущенные',
     'settings.cancel': 'Отмена',
     'settings.save': 'Сохранить',
 
@@ -153,18 +150,12 @@ const DICT = {
 
     // Auth screen
     'auth.tagline': 'Войди, чтобы напоминания синхронизировались на всех твоих устройствах',
-    'auth.save_url': 'Сохранить URL',
     'auth.login': 'Войти по ключу доступа',
     'auth.or': 'или',
     'auth.name_label': 'Имя (любое)',
     'auth.name_ph': 'Например: Айхан',
     'auth.register': 'Создать аккаунт',
     'auth.hint': 'Ключ доступа (passkey) — безопасный вход по Face ID, Touch ID или Windows Hello. Без пароля. Аккаунт привязан к ключу на этом устройстве. На других устройствах войди через связку ключей iCloud или Google или добавь новый ключ в настройках.',
-    'auth.need_worker': 'Сначала настрой Worker URL',
-    'auth.bad_url': 'Введи корректный URL (https://…)',
-    'auth.checking': 'Проверяю…',
-    'auth.worker_ok': 'Worker OK — входи через passkey',
-    'auth.worker_err': 'Worker не отвечает: {err}',
     'auth.checking_passkey': 'Проверяю ключ доступа…',
     'auth.welcome': 'Добро пожаловать',
     'auth.creating': 'Создаю ключ доступа…',
@@ -188,10 +179,7 @@ const DICT = {
     'toast.compose_when': 'Выбери дату и время',
     'toast.notifications_on': 'Уведомления включены',
     'toast.failed': 'Не удалось: {err}',
-    'toast.cleared_missed': 'Очищено: {n}',
-    'toast.no_missed': 'Пропущенных не было',
     'toast.settings_saved': 'Настройки сохранены',
-    'toast.worker_cleared': 'Worker URL очищен, режим оффлайн',
 
     // Status pill
     'status.offline': 'Оффлайн',
@@ -201,15 +189,8 @@ const DICT = {
     // Banner
     'banner.no_notification_api': 'Твой браузер не поддерживает уведомления.',
     'banner.connecting_push': 'Уведомления разрешены. Подключаю push…',
-    'banner.configure_worker': 'Для надёжных уведомлений настрой Worker URL в настройках ⚙️',
     'banner.notifications_blocked': 'Уведомления заблокированы. Разреши их в настройках сайта.',
     'banner.need_permission': 'Для работы нужно разрешить уведомления.',
-
-    // Settings save
-    'settings.status.checking': 'Проверяю…',
-    'settings.status.bad_url': 'URL должен начинаться с http:// или https://',
-    'settings.status.fail': 'Не удалось подключиться: {err}',
-    'settings.status.ok': 'Подключено ✓',
 
     // Текст локального уведомления, если у напоминания нет заметки
     'notify.default_body': 'Пора!',
@@ -326,10 +307,7 @@ const DICT = {
     'takeover.wrong': 'Yox. Diqqətlə oxu.',
 
     'settings.title': 'Parametrlər',
-    'settings.worker_url': 'Cloudflare Worker URL',
-    'settings.worker_hint': 'URL olmadan tətbiq lokal işləyir — push yalnız app açıq olanda gələcək.',
     'settings.lang': 'Dil',
-    'settings.clear_missed': 'Buraxılanları təmizlə',
     'settings.cancel': 'İmtina',
     'settings.save': 'Yadda saxla',
 
@@ -359,18 +337,12 @@ const DICT = {
     'acc.hello': 'Salam, {name}!',
 
     'auth.tagline': 'Xatırladıcıların bütün cihazlarında sinxron olsun deyə daxil ol',
-    'auth.save_url': 'URL-i yadda saxla',
     'auth.login': 'Passkey ilə daxil ol',
     'auth.or': 'və ya',
     'auth.name_label': 'Ad (istənilən)',
     'auth.name_ph': 'Məsələn: Ayxan',
     'auth.register': 'Hesab yarat',
     'auth.hint': 'Passkey — Face ID / Touch ID / Windows Hello ilə təhlükəsiz giriş. Şifrə yoxdur. Hesab bu cihazdakı passkey-ə bağlıdır. Digər cihazlarda iCloud Keychain / Google Password Manager ilə daxil ol və ya parametrlərdən yeni passkey əlavə et.',
-    'auth.need_worker': 'Əvvəlcə Worker URL-i təyin et',
-    'auth.bad_url': 'Düzgün URL daxil et (https://…)',
-    'auth.checking': 'Yoxlayıram…',
-    'auth.worker_ok': 'Worker OK — passkey ilə daxil ol',
-    'auth.worker_err': 'Worker cavab vermir: {err}',
     'auth.checking_passkey': 'Passkey-i yoxlayıram…',
     'auth.welcome': 'Xoş gəldin',
     'auth.creating': 'Passkey yaradıram…',
@@ -392,10 +364,7 @@ const DICT = {
     'toast.compose_when': 'Tarix və vaxtı seç',
     'toast.notifications_on': 'Bildirişlər aktivdir',
     'toast.failed': 'Alınmadı: {err}',
-    'toast.cleared_missed': 'Təmizləndi: {n}',
-    'toast.no_missed': 'Buraxılan yox idi',
     'toast.settings_saved': 'Parametrlər yadda saxlandı',
-    'toast.worker_cleared': 'Worker URL silindi, oflayn rejim',
 
     'status.offline': 'Oflayn',
     'status.active': '● Push aktivdir',
@@ -403,14 +372,8 @@ const DICT = {
 
     'banner.no_notification_api': 'Brauzerin bildirişləri dəstəkləmir.',
     'banner.connecting_push': 'Bildirişlərə icazə var. Push qoşulur…',
-    'banner.configure_worker': 'Etibarlı bildirişlər üçün parametrlərdə Worker URL-i təyin et ⚙️',
     'banner.notifications_blocked': 'Bildirişlər bloklanıb. Sayt parametrlərində icazə ver.',
     'banner.need_permission': 'İşləməsi üçün bildirişlərə icazə ver.',
-
-    'settings.status.checking': 'Yoxlayıram…',
-    'settings.status.bad_url': 'URL http:// və ya https:// ilə başlamalıdır',
-    'settings.status.fail': 'Qoşulmadı: {err}',
-    'settings.status.ok': 'Qoşuldu ✓',
 
     'notify.default_body': 'Vaxtıdır!',
 
@@ -524,10 +487,7 @@ const DICT = {
     'takeover.wrong': 'Wrong. Read carefully.',
 
     'settings.title': 'Settings',
-    'settings.worker_url': 'Cloudflare Worker URL',
-    'settings.worker_hint': 'Without a URL the app works locally — push only arrives while the app is open.',
     'settings.lang': 'Language',
-    'settings.clear_missed': 'Clear missed',
     'settings.cancel': 'Cancel',
     'settings.save': 'Save',
 
@@ -557,18 +517,12 @@ const DICT = {
     'acc.hello': 'Hi, {name}!',
 
     'auth.tagline': 'Sign in so your reminders sync across all your devices',
-    'auth.save_url': 'Save URL',
     'auth.login': 'Sign in with passkey',
     'auth.or': 'or',
     'auth.name_label': 'Name (anything)',
     'auth.name_ph': 'Example: Alex',
     'auth.register': 'Create account',
     'auth.hint': 'Passkey is a secure sign-in with Face ID / Touch ID / Windows Hello. No passwords. The account is tied to the passkey on this device. On other devices sign in via iCloud Keychain / Google Password Manager or add a new passkey from settings.',
-    'auth.need_worker': 'Set the Worker URL first',
-    'auth.bad_url': 'Enter a valid URL (https://…)',
-    'auth.checking': 'Checking…',
-    'auth.worker_ok': 'Worker OK — sign in with passkey',
-    'auth.worker_err': 'Worker not responding: {err}',
     'auth.checking_passkey': 'Checking passkey…',
     'auth.welcome': 'Welcome',
     'auth.creating': 'Creating passkey…',
@@ -590,10 +544,7 @@ const DICT = {
     'toast.compose_when': 'Pick date and time',
     'toast.notifications_on': 'Notifications enabled',
     'toast.failed': 'Failed: {err}',
-    'toast.cleared_missed': 'Cleared: {n}',
-    'toast.no_missed': 'No missed reminders',
     'toast.settings_saved': 'Settings saved',
-    'toast.worker_cleared': 'Worker URL cleared, offline mode',
 
     'status.offline': 'Offline',
     'status.active': '● Push active',
@@ -601,14 +552,8 @@ const DICT = {
 
     'banner.no_notification_api': 'Your browser does not support notifications.',
     'banner.connecting_push': 'Notifications allowed. Connecting push…',
-    'banner.configure_worker': 'For reliable notifications configure the Worker URL in settings ⚙️',
     'banner.notifications_blocked': 'Notifications are blocked. Allow them in site settings.',
     'banner.need_permission': 'Please allow notifications for the app to work.',
-
-    'settings.status.checking': 'Checking…',
-    'settings.status.bad_url': 'URL must start with http:// or https://',
-    'settings.status.fail': 'Could not connect: {err}',
-    'settings.status.ok': 'Connected ✓',
 
     'notify.default_body': 'Time!',
 

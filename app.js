@@ -10,6 +10,9 @@ import {
   SUPPORTED_LANGS,
 } from '/i18n.js';
 
+/** Продакшен API. Меняется только при смене воркера в Cloudflare. */
+const DEFAULT_WORKER_URL = 'https://push-az-worker.ayxan-a.workers.dev';
+
 // ============================================================================
 // State
 // ============================================================================
@@ -54,8 +57,6 @@ const toastRoot = $('#toast-root');
 const settingsBtn = $('#settings-btn');
 const settingsDialog = $('#settings-dialog');
 const settingsForm = $('#settings-form');
-const settingsWorkerUrl = $('#settings-worker-url');
-const settingsStatus = $('#settings-status');
 const pushStatusPill = $('#push-status-pill');
 const takeoverEl = $('#takeover');
 const takeoverTitle = $('#takeover-title');
@@ -227,7 +228,11 @@ async function initConfig() {
     await config.set('deviceId', deviceId);
   }
   state.deviceId = deviceId;
-  state.workerUrl = (await config.get('workerUrl', '')).replace(/\/+$/, '');
+  const base = DEFAULT_WORKER_URL.replace(/\/+$/, '');
+  state.workerUrl = base;
+  try {
+    await config.set('workerUrl', base);
+  } catch {}
   state.vapidPublicKey = await config.get('vapidPublicKey', '');
   state.sessionToken = await config.get('sessionToken', '');
   state.user = await config.get('user', null);
@@ -282,14 +287,6 @@ async function api(path, options = {}) {
     throw err;
   }
   return data;
-}
-
-async function apiHealth(workerUrl) {
-  const res = await fetch(workerUrl.replace(/\/+$/, '') + '/api/health', {
-    headers: { 'X-Device-Id': state.deviceId },
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
 }
 
 // ============================================================================
@@ -513,22 +510,7 @@ function renderAuthScreen() {
   if (!screen) return;
   screen.hidden = false;
   document.body.style.overflow = 'hidden';
-
-  const workerRow = document.getElementById('auth-worker-row');
-  const actions = document.getElementById('auth-actions');
-  const workerInput = document.getElementById('auth-worker-url');
-
-  if (workerInput && state.workerUrl) workerInput.value = state.workerUrl;
-
-  if (!state.workerUrl) {
-    if (workerRow) workerRow.hidden = false;
-    if (actions) actions.hidden = true;
-    setAuthStatus(t('auth.need_worker'), 'pending');
-  } else {
-    if (workerRow) workerRow.hidden = true;
-    if (actions) actions.hidden = false;
-    setAuthStatus('', null);
-  }
+  setAuthStatus('', null);
 }
 
 function hideAuthScreen() {
@@ -538,31 +520,9 @@ function hideAuthScreen() {
 }
 
 function setupAuthScreen() {
-  const workerInput = document.getElementById('auth-worker-url');
-  const saveWorkerBtn = document.getElementById('auth-save-worker');
   const loginBtn = document.getElementById('auth-login-btn');
   const registerForm = document.getElementById('auth-register-form');
   const displayNameEl = document.getElementById('auth-display-name');
-
-  if (saveWorkerBtn && workerInput) {
-    saveWorkerBtn.addEventListener('click', async () => {
-      const url = (workerInput.value || '').trim().replace(/\/+$/, '');
-      if (!url || !/^https?:\/\//i.test(url)) {
-        setAuthStatus(t('auth.bad_url'), 'error');
-        return;
-      }
-      setAuthStatus(t('auth.checking'), 'pending');
-      try {
-        await apiHealth(url);
-        state.workerUrl = url;
-        await config.set('workerUrl', url);
-        setAuthStatus(t('auth.worker_ok'), 'success');
-        renderAuthScreen();
-      } catch (err) {
-        setAuthStatus(t('auth.worker_err', { err: err?.message || err }), 'error');
-      }
-    });
-  }
 
   if (loginBtn) {
     loginBtn.addEventListener('click', async () => {
@@ -1406,9 +1366,6 @@ async function takeoverSnoozeAction() {
 // ============================================================================
 
 async function openSettings() {
-  settingsWorkerUrl.value = state.workerUrl || '';
-  settingsStatus.textContent = '';
-  settingsStatus.className = '';
   const langSel = document.getElementById('settings-lang');
   if (langSel) langSel.value = getLang();
   renderAccountSection();
@@ -1424,53 +1381,17 @@ function closeSettings() {
 
 async function saveSettings(e) {
   e.preventDefault();
-  const url = settingsWorkerUrl.value.trim().replace(/\/+$/, '');
   const langSel = document.getElementById('settings-lang');
   if (langSel && langSel.value && langSel.value !== getLang()) {
     await changeLang(langSel.value);
   }
-  settingsStatus.textContent = t('settings.status.checking');
-  settingsStatus.className = '';
-
-  if (!url) {
-    state.workerUrl = '';
-    state.pushSubscribed = false;
-    state.vapidPublicKey = '';
-    await config.set('workerUrl', '');
-    await config.set('vapidPublicKey', '');
-    updatePushStatusPill();
-    updatePermissionUI();
-    closeSettings();
-    toast(t('toast.worker_cleared'));
-    return;
-  }
-
-  if (!/^https?:\/\//.test(url)) {
-    settingsStatus.textContent = t('settings.status.bad_url');
-    settingsStatus.className = 'error';
-    return;
-  }
-
-  try {
-    await apiHealth(url);
-  } catch (err) {
-    settingsStatus.textContent = t('settings.status.fail', { err: err.message });
-    settingsStatus.className = 'error';
-    return;
-  }
-
-  state.workerUrl = url;
-  await config.set('workerUrl', url);
-  settingsStatus.textContent = t('settings.status.ok');
-  settingsStatus.className = 'success';
-
   if (Notification.permission === 'granted') {
-    await ensurePushSubscription();
+    try { await ensurePushSubscription(); } catch {}
   }
-  await syncAllReminders();
+  try { await syncAllReminders(); } catch {}
   updatePushStatusPill();
   updatePermissionUI();
-  setTimeout(closeSettings, 600);
+  closeSettings();
   toast(t('toast.settings_saved'), 'success');
 }
 
@@ -1485,8 +1406,6 @@ async function updatePermissionUI() {
     permissionBtn.hidden = true;
     if (state.workerUrl && !state.pushSubscribed) {
       setBanner(t('banner.connecting_push'), 'warning');
-    } else if (!state.workerUrl) {
-      setBanner(t('banner.configure_worker'), 'warning');
     } else {
       setBanner('', '');
     }
@@ -1763,35 +1682,6 @@ function bindEvents() {
   );
 
   if (takeoverSnooze) takeoverSnooze.addEventListener('click', takeoverSnoozeAction);
-
-  const clearMissedBtn = document.getElementById('clear-missed-btn');
-  if (clearMissedBtn) {
-    clearMissedBtn.addEventListener('click', async () => {
-      console.log('[clear-missed] click', { url: state.workerUrl, hasToken: !!state.sessionToken });
-      if (!state.workerUrl || !state.sessionToken) {
-        toast(t('err.unauthorized'), 'error');
-        return;
-      }
-      clearMissedBtn.disabled = true;
-      const origText = clearMissedBtn.textContent;
-      clearMissedBtn.textContent = '…';
-      try {
-        const res = await api('/api/reminders/clear-missed', { method: 'POST', body: {} });
-        console.log('[clear-missed] response', res);
-        const n = Number(res?.changes || 0);
-        toast(n > 0 ? t('toast.cleared_missed', { n }) : t('toast.no_missed'), 'success');
-        closeSettings();
-        hideTakeover();
-        await syncAllReminders();
-      } catch (err) {
-        console.error('[clear-missed] error', err);
-        toast(t('err.generic', { err: err?.message || err }), 'error');
-      } finally {
-        clearMissedBtn.disabled = false;
-        clearMissedBtn.textContent = origText;
-      }
-    });
-  }
 
   setupTelegramButtons();
 

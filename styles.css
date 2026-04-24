@@ -737,15 +737,6 @@ body.has-overdue .brand-text h1 {
   font-size: 11px;
 }
 
-.settings-status {
-  font-size: 15px;
-  min-height: 20px;
-  color: var(--text-dim);
-}
-
-.settings-status.success { color: #86efac; }
-.settings-status.error { color: #fca5a5; }
-
 .install-banner {
   background: linear-gradient(135deg, rgba(45, 212, 191, 0.1), rgba(56, 189, 248, 0.06));
   border: 1px solid rgba(45, 212, 191, 0.22);
@@ -851,13 +842,6 @@ body.has-overdue .brand-text h1 {
     justify-content: flex-end;
     margin-top: 4px;
   }
-}
-
-.settings-diagnostics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 14px 0 6px;
 }
 
 .btn-small {
@@ -1205,16 +1189,6 @@ body.has-overdue .brand-text h1 {
   color: var(--text);
   border: 1px solid var(--border);
   font-size: 13px;
-}
-
-.auth-worker-row {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
 
 .auth-worker-row .field { margin: 0; }
