@@ -64,6 +64,10 @@ html[data-theme="light"] {
   padding: 0;
 }
 
+html {
+  touch-action: manipulation;
+}
+
 html,
 body {
   height: 100%;
