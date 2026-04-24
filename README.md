@@ -2,6 +2,8 @@
 
 **Osobyy reminder dlya iPhone s push-uvedomleniyami, kotoryye ne nadoyedayut.**
 
+Plan rasshireniy i status zadach: **[ROADMAP.md](./ROADMAP.md)**.
+
 Glavnoye otlichiye ot obychnykh reminderov: kazhdoye napominaniye prikhodit s **unikal'nym tekstom** (generiruyem cherez Cloudflare Workers AI), **trebuyet knopku "Gotovo"**, a yesli ignoriruyesh' \u2014 push prikhodit **snova s narastayushchey srochnost'yu**. Plyus pri otkrytii prilozheniya s neotvechennym reminder'om pokazyvayetsya polnoekrannyy "takeover" ekran.
 
 ## Arkhitektura
