@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#323e52" />
+  <meta id="meta-theme-color" name="theme-color" content="#323e52" />
   <meta name="description" content="push.az — reminder, который точно донесёт уведомление" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -16,6 +16,17 @@
   <link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon-64.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="/styles.css" />
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('push_az_theme');
+        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        else document.documentElement.removeAttribute('data-theme');
+        var m = document.getElementById('meta-theme-color');
+        if (m) m.setAttribute('content', t === 'light' ? '#f4f7fb' : '#323e52');
+      } catch (e) {}
+    })();
+  </script>
   <title>push.az — Особый reminder</title>
 </head>
 <body>
@@ -216,6 +227,14 @@
           <option value="ru" data-i18n="lang.ru">Русский</option>
           <option value="az" data-i18n="lang.az">Azərbaycan</option>
           <option value="en" data-i18n="lang.en">English</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span data-i18n="settings.theme">Тема</span>
+        <select id="settings-theme" data-i18n-aria-label="settings.theme" aria-label="Тема">
+          <option value="dark" data-i18n="settings.theme_dark">Тёмная</option>
+          <option value="light" data-i18n="settings.theme_light">Светлая</option>
         </select>
       </label>
 

@@ -25,6 +25,37 @@
   --radius-sm: 12px;
   --shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.55);
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --dialog-surface-top: rgba(48, 58, 74, 0.98);
+  --dialog-surface-bot: rgba(34, 42, 54, 0.99);
+  --backdrop-scrim: rgba(0, 0, 0, 0.6);
+}
+
+html[data-theme="light"] {
+  --bg: #e2e9f2;
+  --bg-grad-1: #f4f7fb;
+  --bg-grad-2: #d5dee9;
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-2: #ffffff;
+  --border: rgba(15, 23, 42, 0.09);
+  --border-strong: rgba(15, 23, 42, 0.14);
+  --text: #0f172a;
+  --text-dim: #475569;
+  --text-muted: #64748b;
+  --accent: #0d9488;
+  --accent-2: #0284c7;
+  --accent-soft: rgba(13, 148, 136, 0.14);
+  --accent-ink: #f0fdfa;
+  --accent-on-surface: #0f766e;
+  --tone-violet-bg: rgba(124, 58, 237, 0.1);
+  --tone-violet-border: rgba(124, 58, 237, 0.22);
+  --tone-violet-text: #5b21b6;
+  --danger: #dc2626;
+  --success: #059669;
+  --warning: #b45309;
+  --shadow: 0 12px 40px -12px rgba(15, 23, 42, 0.14);
+  --dialog-surface-top: rgba(255, 255, 255, 0.98);
+  --dialog-surface-bot: #eef2f7;
+  --backdrop-scrim: rgba(15, 23, 42, 0.38);
 }
 
 * {
@@ -53,6 +84,46 @@ body {
   -webkit-font-smoothing: antialiased;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+html[data-theme="light"] body {
+  background:
+    radial-gradient(1000px 560px at 10% -6%, rgba(13, 148, 136, 0.1), transparent 55%),
+    radial-gradient(780px 500px at 98% 6%, rgba(2, 132, 199, 0.07), transparent 52%),
+    linear-gradient(168deg, var(--bg-grad-1) 0%, var(--bg) 42%, var(--bg-grad-2) 100%);
+}
+
+html[data-theme="light"] .takeover-backdrop {
+  background:
+    radial-gradient(900px 600px at 50% 28%, rgba(13, 148, 136, 0.1), transparent 62%),
+    radial-gradient(900px 600px at 50% 78%, rgba(2, 132, 199, 0.06), transparent 60%),
+    rgba(241, 245, 249, 0.9);
+}
+
+html[data-theme="light"] .takeover-content {
+  background: rgba(255, 255, 255, 0.96);
+}
+
+html[data-theme="light"] .takeover-challenge {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .takeover-challenge-prompt {
+  color: var(--text);
+}
+
+html[data-theme="light"] .takeover-challenge-prompt strong {
+  color: var(--accent-on-surface);
+  text-shadow: none;
+}
+
+html[data-theme="light"] .settings-tg-code-value {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="light"] .settings-tg-code code {
+  background: rgba(15, 23, 42, 0.08);
 }
 
 button,
@@ -279,6 +350,10 @@ body.has-overdue .brand-logo {
 .btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: var(--border-strong);
+}
+
+html[data-theme="light"] .btn:hover {
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .btn:active {
@@ -662,7 +737,7 @@ body.has-overdue .brand-logo {
 .composer-dialog {
   border: 1px solid var(--border-strong);
   border-radius: calc(var(--radius) + 2px);
-  background: linear-gradient(180deg, rgba(48, 58, 74, 0.98), rgba(34, 42, 54, 0.99));
+  background: linear-gradient(180deg, var(--dialog-surface-top), var(--dialog-surface-bot));
   color: var(--text);
   padding: 0;
   max-width: 440px;
@@ -670,9 +745,14 @@ body.has-overdue .brand-logo {
   box-shadow: 0 28px 64px -16px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(45, 212, 191, 0.06);
 }
 
+html[data-theme="light"] .settings-dialog,
+html[data-theme="light"] .composer-dialog {
+  box-shadow: 0 28px 64px -16px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(13, 148, 136, 0.1);
+}
+
 .settings-dialog::backdrop,
 .composer-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--backdrop-scrim);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }

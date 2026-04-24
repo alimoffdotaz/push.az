@@ -1394,6 +1394,8 @@ async function takeoverSnoozeAction() {
 async function openSettings() {
   const langSel = document.getElementById('settings-lang');
   if (langSel) langSel.value = getLang();
+  const themeSel = document.getElementById('settings-theme');
+  if (themeSel) themeSel.value = getStoredTheme();
   renderAccountSection();
   renderTelegramSection();
   if (settingsDialog.showModal) settingsDialog.showModal();
@@ -1540,6 +1542,28 @@ function handleURLAction() {
 
 let deferredInstall = null;
 const INSTALL_DISMISS_KEY = 'push_az_install_dismissed';
+const THEME_STORAGE_KEY = 'push_az_theme';
+
+function getStoredTheme() {
+  try {
+    const v = localStorage.getItem(THEME_STORAGE_KEY);
+    if (v === 'light' || v === 'dark') return v;
+  } catch {}
+  return 'dark';
+}
+
+function applyTheme(theme) {
+  const light = theme === 'light';
+  if (light) document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) meta.setAttribute('content', light ? '#f4f7fb' : '#323e52');
+  const apple = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (apple) apple.setAttribute('content', light ? 'default' : 'black-translucent');
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, light ? 'light' : 'dark');
+  } catch {}
+}
 
 function isStandalone() {
   return (
@@ -1692,6 +1716,12 @@ function bindEvents() {
       await changeLang(settingsLangSel.value);
     });
   }
+  const settingsThemeSel = document.getElementById('settings-theme');
+  if (settingsThemeSel) {
+    settingsThemeSel.addEventListener('change', () => {
+      applyTheme(settingsThemeSel.value);
+    });
+  }
   document.querySelectorAll('[data-close-settings]').forEach((b) =>
     b.addEventListener('click', closeSettings),
   );
@@ -1770,6 +1800,7 @@ function bindEvents() {
 // ============================================================================
 
 (async function init() {
+  applyTheme(getStoredTheme());
   setMinDateTime();
   await initConfig();
   await registerSW();

@@ -118,6 +118,9 @@ const DICT = {
     // Settings
     'settings.title': 'Настройки',
     'settings.lang': 'Язык',
+    'settings.theme': 'Тема',
+    'settings.theme_dark': 'Тёмная',
+    'settings.theme_light': 'Светлая',
     'settings.cancel': 'Отмена',
     'settings.save': 'Сохранить',
 
@@ -308,6 +311,9 @@ const DICT = {
 
     'settings.title': 'Parametrlər',
     'settings.lang': 'Dil',
+    'settings.theme': 'Tema',
+    'settings.theme_dark': 'Tünd',
+    'settings.theme_light': 'Açıq',
     'settings.cancel': 'İmtina',
     'settings.save': 'Yadda saxla',
 
@@ -488,6 +494,9 @@ const DICT = {
 
     'settings.title': 'Settings',
     'settings.lang': 'Language',
+    'settings.theme': 'Theme',
+    'settings.theme_dark': 'Dark',
+    'settings.theme_light': 'Light',
     'settings.cancel': 'Cancel',
     'settings.save': 'Save',
 
