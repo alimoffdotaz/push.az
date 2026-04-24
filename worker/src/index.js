@@ -457,11 +457,17 @@ async function handleAck(request, env, user) {
 
 async function countPendingRemindersForUser(env, userId) {
   try {
+    const now = Date.now();
     const row = await env.DB.prepare(
       `SELECT COUNT(*) AS c FROM reminders
-       WHERE user_id = ?1 AND status = 'active' AND fire_at <= ?2`,
+       WHERE user_id = ?1
+         AND acked_at IS NULL
+         AND (
+           status = 'missed'
+           OR (status = 'active' AND fire_at <= ?2)
+         )`,
     )
-      .bind(userId, Date.now())
+      .bind(userId, now)
       .first();
     return Number(row?.c || 0);
   } catch {

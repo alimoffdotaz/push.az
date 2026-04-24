@@ -105,6 +105,11 @@ body.has-overdue .app-header::before {
 body.has-overdue .brand-text h1 {
   color: #fecaca;
 }
+body.has-overdue .brand-logo {
+  background: linear-gradient(145deg, #b91c1c 0%, #f87171 42%, #fb7185 100%);
+  color: #fff;
+  box-shadow: 0 10px 28px -8px rgba(185, 28, 28, 0.55);
+}
 @keyframes pushAzAlertPulse {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.85; }

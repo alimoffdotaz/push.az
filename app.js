@@ -893,6 +893,7 @@ async function syncAllReminders() {
           fireAt: Number(s.fire_at),
           repeat: s.repeat || 'none',
           tone: s.tone || 'friendly',
+          status: s.status || 'active',
           acked: s.status === 'acked' || !!s.acked_at,
           updatedAt: Number(s.updated_at) || Date.now(),
           createdAt: Number(s.created_at) || Date.now(),
@@ -942,16 +943,25 @@ async function load() {
   render();
 }
 
+/** Napominaniya, trebuyuschiye reaktsii: propushchennye (missed) ili vremya uzhe proshlo. */
+function countAttentionReminders(reminders, now = Date.now()) {
+  let n = 0;
+  for (const r of reminders) {
+    if (r.acked) continue;
+    if (r.status === 'missed' || r.fireAt <= now) n++;
+  }
+  return n;
+}
+
 function render() {
   const now = Date.now();
   const upcoming = [];
   const past = [];
-  let overdue = 0;
   for (const r of state.reminders) {
     if (r.fireAt >= now - 60 * 1000 || r.repeat !== 'none') upcoming.push(r);
     else past.push(r);
-    if (r.fireAt <= now && !r.acked) overdue++;
   }
+  const overdue = countAttentionReminders(state.reminders, now);
 
   listEl.innerHTML = '';
   upcoming.forEach((r) => listEl.appendChild(renderItem(r)));
@@ -975,13 +985,21 @@ function render() {
 
 async function updateAppBadge(count) {
   try {
-    if (count > 0 && navigator.setAppBadge) {
-      await navigator.setAppBadge(count);
+    if (count > 0) {
+      if (navigator.setAppBadge) await navigator.setAppBadge(count);
     } else if (navigator.clearAppBadge) {
       await navigator.clearAppBadge();
     }
   } catch {
     // unsupported \u2014 ignore
+  }
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    if (reg?.active) {
+      reg.active.postMessage({ type: 'set-badge', count });
+    }
+  } catch {
+    // ignore
   }
   try {
     document.title = count > 0 ? `(${count}) \u26a0 push.az \u2014 propuschen` : 'push.az \u2014 Osobyy Reminder';
@@ -1245,6 +1263,7 @@ function tickUpdate() {
     if (cls) rel.classList.add(cls);
   }
   checkTakeover();
+  updateAppBadge(countAttentionReminders(state.reminders, Date.now()));
 }
 
 // ============================================================================
