@@ -395,6 +395,11 @@ html[data-theme="light"] .btn:hover {
   gap: 10px;
 }
 
+/* display:flex на .banner перебивает UA [hidden] в Safari — пустая полоса. */
+.banner[hidden] {
+  display: none !important;
+}
+
 .banner.warning {
   border-color: rgba(245, 158, 11, 0.4);
   background: rgba(245, 158, 11, 0.08);
@@ -722,6 +727,18 @@ html[data-theme="light"] .btn:hover {
   background: var(--surface-2);
   border-color: var(--border);
   color: var(--text-muted);
+}
+
+html[data-theme="light"] .pill-success {
+  background: rgba(5, 150, 105, 0.14);
+  border-color: rgba(4, 120, 87, 0.35);
+  color: #047857;
+}
+
+html[data-theme="light"] .pill-warning {
+  background: rgba(180, 83, 9, 0.12);
+  border-color: rgba(154, 52, 18, 0.35);
+  color: #9a3412;
 }
 
 .tag-tone {
