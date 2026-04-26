@@ -602,7 +602,7 @@ async function processOneReminder(env, r, vapid, now) {
     return;
   }
 
-  const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone };
+  const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
   // Yazyk pol'zovatelya (dlya AI, fallback'ov i Telegram formattera)
   let lang = 'ru';
@@ -611,7 +611,7 @@ async function processOneReminder(env, r, vapid, now) {
     if (u?.lang) lang = u.lang;
   } catch {}
 
-  const built = await buildPushBody(env, reminder, attempt, lang);
+  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS);
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)

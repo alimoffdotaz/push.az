@@ -221,6 +221,7 @@ const SYSTEM_PROMPTS = {
     '6. Без эмодзи, без CAPS LOCK, без тройных восклицательных знаков.\n' +
     '7. Стиль: ' + toneInstr + '.\n' +
     '8. Разнообразие. НЕ начинай всегда с «Напоминаю:».\n' +
+    '9. Если есть длинная заметка — один короткий крючок к задаче; не пересказывай заметку целиком (факты из неё система добавит отдельно).\n' +
     'ПРИМЕРЫ:\n' +
     '  «Твоя задача отчёт ждёт тебя.»\n' +
     '  «Эй, пора начать отчёт.»\n' +
@@ -235,6 +236,7 @@ const SYSTEM_PROMPTS = {
     '6. Emoji yoxdur, CAPS LOCK yoxdur, üçlü nida işarəsi yoxdur.\n' +
     '7. Ton: ' + toneInstr + '.\n' +
     '8. Fərqli ol. Həmişə "Xatırladıram:" ilə başlama.\n' +
+    '9. Uzun qeyd varsa — qısa çəngəl; bütün qeydi təkrarlamayın (sistem ayrıca fakt əlavə edə bilər).\n' +
     'NÜMUNƏLƏR:\n' +
     '  "Sənin hesabat tapşırığın səni gözləyir."\n' +
     '  "Hey, hesabata başlamaq vaxtıdır."\n' +
@@ -249,6 +251,7 @@ const SYSTEM_PROMPTS = {
     '6. No emoji, no CAPS LOCK, no triple exclamation marks.\n' +
     '7. Style: ' + toneInstr + '.\n' +
     '8. Be varied. Do NOT always start with "Reminder:".\n' +
+    '9. If there is a long note — one short hook; do not paste the whole note (the system may add factual detail separately).\n' +
     'EXAMPLES:\n' +
     '  "Your report is waiting for you."\n' +
     '  "Hey, time to start the report."\n' +
@@ -259,15 +262,15 @@ const USER_PROMPTS = {
   ru: (reminder, attempt) =>
     `Задача: ${reminder.title}` +
     (reminder.note ? `. Контекст: ${reminder.note}` : '') +
-    `. Попытка: ${attempt}. Напиши одну свежую строку-напоминание на русском.`,
+    `. Попытка: ${attempt}. Напиши одну свежую строку-напоминание на русском. Не дублируй длинную заметку дословно.`,
   az: (reminder, attempt) =>
     `Tapşırıq: ${reminder.title}` +
     (reminder.note ? `. Kontekst: ${reminder.note}` : '') +
-    `. Cəhd: ${attempt}. Azərbaycan dilində bir yeni xatırlatma sətri yaz.`,
+    `. Cəhd: ${attempt}. Azərbaycan dilində bir yeni xatırlatma sətri yaz. Uzun qeydi söz-söz təkrarlamayın.`,
   en: (reminder, attempt) =>
     `Task: ${reminder.title}` +
     (reminder.note ? `. Context: ${reminder.note}` : '') +
-    `. Attempt: ${attempt}. Write one fresh reminder line in English.`,
+    `. Attempt: ${attempt}. Write one fresh reminder line in English. Do not quote the whole note verbatim.`,
 };
 
 export async function generateAIText(ai, reminder, attempt, lang = 'ru') {
@@ -333,7 +336,118 @@ const OPEN_HINTS = {
   ],
 };
 
-export async function buildPushBody(env, reminder, attempt, lang = 'ru') {
+function stablePickIndex(seedStr, modulo) {
+  if (modulo <= 0) return 0;
+  let h = 0;
+  const s = String(seedStr);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h) % modulo;
+}
+
+function stripNote(note) {
+  return String(note || '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function clipForAtom(s, maxLen) {
+  const t = stripNote(s);
+  if (t.length <= maxLen) return t;
+  return t.slice(0, Math.max(0, maxLen - 1)) + '…';
+}
+
+function formatDueShort(fireAtMs, lang) {
+  const n = Number(fireAtMs);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  try {
+    const d = new Date(n);
+    const loc = lang === 'az' ? 'az-AZ' : lang === 'en' ? 'en-US' : 'ru-RU';
+    return d.toLocaleString(loc, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+/** Korotkiye stroki «atomа pol'zy» — tol'ko iz dannykh reminderа. */
+const ATOM_COPY = {
+  ru: {
+    note: 'Заметка:',
+    slip: 'Уже {n} мин после времени',
+    soon: 'Через {n} мин срок',
+    due: 'Было на {t}',
+    att: 'Попытка {a}/{m}',
+  },
+  az: {
+    note: 'Qeyd:',
+    slip: 'Vaxtdan {n} dəqiqə keçdi',
+    soon: '{n} dəqiqəyə vaxt',
+    due: 'Vaxt: {t}',
+    att: 'Cəhd {a}/{m}',
+  },
+  en: {
+    note: 'Note:',
+    slip: '{n} min past due',
+    soon: 'due in {n} min',
+    due: 'Was for {t}',
+    att: 'Attempt {a}/{m}',
+  },
+};
+
+/**
+ * Odin fakt iz title/note/fire_at/attempt — bez vyduмок, dlya bolee «novogo» pushego.
+ */
+export function pickValueAtom(reminder, attempt, maxAttempts, nowMs, lang = 'ru') {
+  const L = pickLang(lang);
+  const A = ATOM_COPY[L] || ATOM_COPY.ru;
+  const fire = Number(reminder.fire_at);
+  const noteFull = stripNote(reminder.note);
+  const noteClip = noteFull.length >= 3 ? clipForAtom(noteFull, 52) : '';
+
+  const overdueMin =
+    Number.isFinite(fire) && fire > 0 && nowMs >= fire
+      ? Math.min(24 * 60, Math.max(1, Math.floor((nowMs - fire) / 60000)))
+      : 0;
+  const upcomingMin =
+    Number.isFinite(fire) && fire > 0 && nowMs < fire
+      ? Math.max(1, Math.ceil((fire - nowMs) / 60000))
+      : 0;
+
+  const dueStr = Number.isFinite(fire) && fire > 0 ? formatDueShort(fire, L) : '';
+
+  const candidates = [];
+  if (noteClip.length >= 3) candidates.push({ k: 'note', v: noteClip });
+  if (overdueMin >= 1) candidates.push({ k: 'slip', n: overdueMin });
+  else if (upcomingMin > 0) candidates.push({ k: 'soon', n: upcomingMin });
+  if (dueStr) candidates.push({ k: 'due', t: dueStr });
+  if (attempt > 1) candidates.push({ k: 'att', a: attempt, m: maxAttempts });
+
+  if (candidates.length === 0) return '';
+
+  const idx = stablePickIndex(String(reminder.id) + '|' + attempt, candidates.length);
+  const c = candidates[idx];
+
+  if (c.k === 'note') return `${A.note} ${c.v}`;
+  if (c.k === 'slip') return A.slip.replace('{n}', String(c.n));
+  if (c.k === 'soon') return A.soon.replace('{n}', String(c.n));
+  if (c.k === 'due') return A.due.replace('{t}', c.t);
+  if (c.k === 'att') return A.att.replace('{a}', String(c.a)).replace('{m}', String(c.m));
+  return '';
+}
+
+export async function buildPushBody(
+  env,
+  reminder,
+  attempt,
+  lang = 'ru',
+  nowMs = Date.now(),
+  maxAttempts = 5,
+) {
   const L = pickLang(lang);
   let baseText = null;
   if (env.ENABLE_AI_GENERATION === 'true' && env.AI) {
@@ -341,13 +455,16 @@ export async function buildPushBody(env, reminder, attempt, lang = 'ru') {
   }
   if (!baseText) baseText = pickFallbackText(reminder, attempt, L);
 
+  const atom = pickValueAtom(reminder, attempt, maxAttempts, nowMs, L);
+  if (atom) baseText = `${baseText} · ${atom}`;
+
   if (attempt >= 2) {
     const hints = OPEN_HINTS[L] || OPEN_HINTS.ru;
     const hint = hints[Math.floor(Math.random() * hints.length)];
     baseText = `${baseText} → ${hint}`;
   }
 
-  if (baseText.length > 140) baseText = baseText.slice(0, 137) + '…';
+  if (baseText.length > 220) baseText = baseText.slice(0, 217) + '…';
 
   return { text: baseText, challenge: null };
 }
