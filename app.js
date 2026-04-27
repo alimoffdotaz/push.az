@@ -217,6 +217,17 @@ function uint8ToB64u(buffer) {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** Sravneniye VAPID klyuchey (b64url): padding, +/ vs -/_ ne lomayut sovpadeniye. */
+function b64uEqual(a, b) {
+  const norm = (s) =>
+    String(s || '')
+      .trim()
+      .replace(/=+$/, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+  return norm(a) === norm(b);
+}
+
 // ============================================================================
 // Config / Device ID
 // ============================================================================
@@ -242,7 +253,11 @@ async function initConfig() {
   setLang(initialLang);
   if (!savedLang) { try { await config.set('lang', initialLang); } catch {} }
   applyTranslations();
-  onLangChange(() => { applyTranslations(); render(); });
+  onLangChange(() => {
+    applyTranslations();
+    updatePushStatusPill();
+    render();
+  });
 }
 
 async function changeLang(lang, opts = {}) {
@@ -386,6 +401,7 @@ async function saveSession(token, user) {
 async function clearSession() {
   state.sessionToken = '';
   state.user = null;
+  state.pushSubscribed = false;
   await config.set('sessionToken', '');
   await config.set('user', null);
 }
@@ -782,7 +798,7 @@ async function ensurePushSubscription() {
     const currentKey = sub.options?.applicationServerKey
       ? uint8ToB64u(sub.options.applicationServerKey)
       : '';
-    if (currentKey && currentKey !== expectedKey) {
+    if (currentKey && !b64uEqual(currentKey, expectedKey)) {
       await sub.unsubscribe();
       sub = null;
     }
@@ -816,11 +832,84 @@ async function ensurePushSubscription() {
   return true;
 }
 
+/**
+ * Podtyagivaem state.pushSubscribed iz brauzera posle reload:
+ * inache pervyy updatePermissionUI idyot do ensurePushSubscription i poloska
+ * ostayetsya vidimoy pri uzhe rabochey podpiske.
+ */
+async function refreshPushSubscribedFromBrowser() {
+  state.pushSubscribed = false;
+  if (!state.workerUrl || !state.sessionToken) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    if (!state.vapidPublicKey) {
+      try {
+        const resp = await api('/api/vapid-public-key', { method: 'GET' });
+        if (resp?.publicKey) {
+          state.vapidPublicKey = resp.publicKey;
+          await config.set('vapidPublicKey', state.vapidPublicKey);
+        }
+      } catch {
+        return;
+      }
+    }
+    if (!state.vapidPublicKey) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    const currentKey = sub.options?.applicationServerKey
+      ? uint8ToB64u(sub.options.applicationServerKey)
+      : '';
+    if (currentKey && !b64uEqual(currentKey, state.vapidPublicKey)) return;
+    state.pushSubscribed = true;
+  } catch {
+    state.pushSubscribed = false;
+  }
+}
+
+function isPushFullyWorking() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+  if (!state.workerUrl) return false;
+  if (!state.sessionToken) return false;
+  return !!state.pushSubscribed;
+}
+
+function syncHeaderPushRow() {
+  const wrap = document.getElementById('header-push-status');
+  if (!wrap) return;
+  const hide = isPushFullyWorking();
+  wrap.hidden = hide;
+  wrap.classList.toggle('header-push-status--gone', hide);
+  wrap.setAttribute('aria-hidden', hide ? 'true' : 'false');
+}
+
 function updatePushStatusPill() {
   if (!pushStatusPill) return;
+  if (!('Notification' in window)) {
+    pushStatusPill.textContent = t('status.no_api_pill');
+    pushStatusPill.className = 'pill pill-warning';
+    syncHeaderPushRow();
+    return;
+  }
+  const perm = Notification.permission;
+  if (perm === 'denied') {
+    pushStatusPill.textContent = t('status.permission_denied');
+    pushStatusPill.className = 'pill pill-warning';
+    syncHeaderPushRow();
+    return;
+  }
+  if (perm !== 'granted') {
+    pushStatusPill.textContent = t('status.prompt_pill');
+    pushStatusPill.className = 'pill pill-muted';
+    syncHeaderPushRow();
+    return;
+  }
   if (!state.workerUrl) {
     pushStatusPill.textContent = t('status.offline');
     pushStatusPill.className = 'pill pill-muted';
+    syncHeaderPushRow();
     return;
   }
   if (state.pushSubscribed) {
@@ -830,6 +919,7 @@ function updatePushStatusPill() {
     pushStatusPill.textContent = t('status.not_configured');
     pushStatusPill.className = 'pill pill-warning';
   }
+  syncHeaderPushRow();
 }
 
 // ============================================================================
@@ -1296,6 +1386,7 @@ function showTakeover(r, totalCount) {
   takeoverEl.dataset.reminderId = r.id;
   takeoverEl.hidden = false;
   takeoverEl.classList.add('active');
+  takeoverEl.scrollTop = 0;
   renderChallenge(false);
   if (navigator.vibrate) {
     try { navigator.vibrate([120, 60, 120, 60, 200]); } catch {}
@@ -1516,7 +1607,6 @@ async function saveSettings(e) {
     try { await ensurePushSubscription(); } catch {}
   }
   try { await syncAllReminders(); } catch {}
-  updatePushStatusPill();
   updatePermissionUI();
   closeSettings();
   toast(t('toast.settings_saved'), 'success');
@@ -1526,6 +1616,7 @@ async function updatePermissionUI() {
   if (!('Notification' in window)) {
     setBanner(t('banner.no_notification_api'), 'warning');
     permissionBtn.hidden = true;
+    updatePushStatusPill();
     return;
   }
   const perm = Notification.permission;
@@ -1543,6 +1634,7 @@ async function updatePermissionUI() {
     permissionBtn.hidden = false;
     setBanner(t('banner.need_permission'), 'warning');
   }
+  updatePushStatusPill();
 }
 
 async function requestPermission() {
@@ -1872,7 +1964,7 @@ function bindEvents() {
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
     tickUpdate();
-    updatePermissionUI();
+    await refreshPushSubscribedFromBrowser();
     // Sperva podtyanem svezhiye reminderы s backend'a (vklyuchaya
     // propushchennye na drugikh ustroystvakh), potom forsiruem takeover.
     if (state.online && state.workerUrl && state.sessionToken) {
@@ -1912,10 +2004,9 @@ function bindEvents() {
   bindEvents();
   setupAuthScreen();
   setupInstallBanner();
-  updatePushStatusPill();
-  await updatePermissionUI();
 
-  // Proveryayem sessiyu. Yesli est' Worker i token \u2014 proverim na serverе.
+  // Snachala proveryaem sessiyu — inache refreshPush idyot s prosrochennym tokenom,
+  // a pervyy updatePermissionUI ne sinhroniziruetsya posle 401.
   if (state.workerUrl && state.sessionToken) {
     try {
       const me = await api('/api/auth/me', { method: 'GET' });
@@ -1927,6 +2018,9 @@ function bindEvents() {
       }
     }
   }
+
+  await refreshPushSubscribedFromBrowser();
+  await updatePermissionUI();
 
   if (!state.sessionToken || !state.user) {
     renderAuthScreen();
@@ -1946,4 +2040,5 @@ function bindEvents() {
 
   startTick();
   handleURLAction();
+  syncHeaderPushRow();
 })();

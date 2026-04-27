@@ -192,6 +192,9 @@ const DICT = {
     'status.offline': 'Оффлайн',
     'status.active': '● Push активен',
     'status.not_configured': '● Push не настроен',
+    'status.permission_denied': '● Уведомления запрещены',
+    'status.prompt_pill': '● Нужно разрешение',
+    'status.no_api_pill': '● Нет API уведомлений',
 
     // Banner
     'banner.no_notification_api': 'Твой браузер не поддерживает уведомления.',
@@ -383,6 +386,9 @@ const DICT = {
     'status.offline': 'Oflayn',
     'status.active': '● Push aktivdir',
     'status.not_configured': '● Push təyin olunmayıb',
+    'status.permission_denied': '● Bildirişlər qadağandır',
+    'status.prompt_pill': '● İcazə lazımdır',
+    'status.no_api_pill': '● Bildiriş API yoxdur',
 
     'banner.no_notification_api': 'Brauzerin bildirişləri dəstəkləmir.',
     'banner.connecting_push': 'Bildirişlərə icazə var. Push qoşulur…',
@@ -570,6 +576,9 @@ const DICT = {
     'status.offline': 'Offline',
     'status.active': '● Push active',
     'status.not_configured': '● Push not configured',
+    'status.permission_denied': '● Notifications blocked',
+    'status.prompt_pill': '● Permission needed',
+    'status.no_api_pill': '● No notification API',
 
     'banner.no_notification_api': 'Your browser does not support notifications.',
     'banner.connecting_push': 'Notifications allowed. Connecting push…',

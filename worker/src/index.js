@@ -611,8 +611,8 @@ async function processOneReminder(env, r, vapid, now) {
     if (u?.lang) lang = u.lang;
   } catch {}
 
-  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS);
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
+  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount);
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)
   if (env.TELEGRAM_BOT_TOKEN) {

@@ -713,8 +713,20 @@ html[data-theme="light"] .toast.error {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+}
+
+.header-push-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.header-push-status[hidden],
+.header-push-status.header-push-status--gone {
+  display: none !important;
 }
 
 .pill {
@@ -981,14 +993,23 @@ html[data-theme="light"] .composer-dialog {
 
 /* ============================================================================
    Takeover screen \u2014 full-screen acknowledgement UI
+   (overflow-y: dlinnyy tekst + challenge; iOS safe-area)
 ============================================================================ */
 .takeover {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 20px max(20px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   opacity: 0;
   pointer-events: none;
   transition: opacity 220ms ease;
@@ -1000,8 +1021,9 @@ html[data-theme="light"] .composer-dialog {
 }
 
 .takeover-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 0;
   background:
     radial-gradient(900px 600px at 50% 28%, rgba(45, 212, 191, 0.12), transparent 62%),
     radial-gradient(900px 600px at 50% 78%, rgba(56, 189, 248, 0.08), transparent 60%),
@@ -1018,6 +1040,10 @@ html[data-theme="light"] .composer-dialog {
 
 .takeover-content {
   position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  margin-top: auto;
+  margin-bottom: auto;
   max-width: 440px;
   width: 100%;
   text-align: center;
@@ -1076,6 +1102,7 @@ html[data-theme="light"] .composer-dialog {
   letter-spacing: -0.02em;
   margin-bottom: 8px;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .takeover-note {
@@ -1083,6 +1110,8 @@ html[data-theme="light"] .composer-dialog {
   margin-bottom: 12px;
   font-size: 17px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .takeover-counter {
@@ -1259,14 +1288,30 @@ html[data-theme="light"] .composer-dialog {
 .takeover-btn-ghost:hover { color: var(--text); }
 
 @media (max-width: 520px) {
+  /* Odna stroka: brend sleva, deystviya sprava — shesterenka ne na otdel'noy polnoi stroke. */
   .app-header {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: flex-start;
+    gap: 10px;
+  }
+  .brand {
+    flex: 1;
+    min-width: 0;
   }
   .header-actions {
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: flex-end;
   }
-  .brand-text h1 { font-size: 18px; }
+  .brand-text h1 {
+    font-size: 18px;
+  }
+  .tagline {
+    max-width: none;
+  }
 }
 
 /* ============================================================================

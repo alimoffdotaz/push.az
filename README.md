@@ -4,6 +4,8 @@
 
 Plan rasshireniy i status zadach: **[ROADMAP.md](./ROADMAP.md)**.
 
+**Gde deploy:** statika PWA (`index.html`, `app.js`, `styles.css`, `sw.js`, …) — **Cloudflare Pages**; backend, cron, push, D1 — **Cloudflare Workers** (katalog `worker/`).
+
 Glavnoye otlichiye ot obychnykh reminderov: kazhdoye napominaniye prikhodit s **unikal'nym tekstom** (generiruyem cherez Cloudflare Workers AI), **trebuyet knopku "Gotovo"**, a yesli ignoriruyesh' \u2014 push prikhodit **snova s narastayushchey srochnost'yu**. Plyus pri otkrytii prilozheniya s neotvechennym reminder'om pokazyvayetsya polnoekrannyy "takeover" ekran.
 
 ## Arkhitektura

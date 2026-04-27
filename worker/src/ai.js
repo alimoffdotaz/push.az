@@ -312,29 +312,100 @@ export async function generateAIText(ai, reminder, attempt, lang = 'ru') {
 // Finalьnaya sborka pusha
 // ============================================================================
 
-const OPEN_HINTS = {
-  ru: [
-    'Тап → в app введи первые буквы названия',
-    'Открой push.az — подтверждение по буквам названия',
-    'Тап, чтобы завершить в приложении',
-    'Подтверди в приложении первыми буквами названия',
-    'Открой push.az → ввод букв из названия',
-  ],
-  az: [
-    'Tap → tətbiqdə adın ilk hərflərini yaz',
-    'push.az aç — adın hərfləri ilə təsdiq',
-    'Bitirmək üçün tətbiqi aç',
-    'Tətbiqdə başlığın ilk hərfləri ilə təsdiqlə',
-    'push.az → başlıqdakı hərflər',
-  ],
-  en: [
-    'Tap → type first letters of the title in the app',
-    'Open push.az — confirm with letters from the title',
-    'Tap to finish in the app',
-    'Confirm in the app using the first letters of the title',
-    'Open push.az → type letters from the title',
-  ],
-};
+/** Skol'ko bukv v challenge — dolzhno sovpadat' s app.js CHALLENGE_LETTER_COUNT */
+const CHALLENGE_LETTER_COUNT = 3;
+
+/**
+ * Pervyye N bukv iz nazvaniya (\p{L}), kak v renderLetterChallenge.
+ * Esli bukv net — v prilozhenii budet cifrovoy challenge.
+ */
+function letterChallengeMetaFromTitle(title) {
+  const letters = [];
+  for (const ch of String(title || '').normalize('NFC').trim()) {
+    if (/\p{L}/u.test(ch)) {
+      letters.push(ch);
+      if (letters.length >= CHALLENGE_LETTER_COUNT) break;
+    }
+  }
+  return { n: letters.length, useLetters: letters.length > 0 };
+}
+
+function formatPendingQueueFragment(pendingCount, lang) {
+  if (pendingCount <= 1) return '';
+  const x = pendingCount - 1;
+  if (lang === 'az') {
+    return x === 1 ? '1 başqa xatırlatma da gözləyir' : `${x} başqa xatırlatma da gözləyir`;
+  }
+  if (lang === 'en') {
+    return x === 1 ? '1 more reminder waiting' : `${x} more reminders waiting`;
+  }
+  if (x === 1) return 'ещё 1 напоминание ждёт';
+  if (x >= 2 && x <= 4) return `ещё ${x} напоминания ждут`;
+  return `ещё ${x} напоминаний ждут`;
+}
+
+/**
+ * Konkretnaya instruktsiya: pochemu nuzhno otkryt' app (challenge nel'zya iz notifikatsii).
+ */
+function buildOpenAppHint(reminder, attempt, maxAttempts, lang) {
+  const L = pickLang(lang);
+  const meta = letterChallengeMetaFromTitle(reminder.title);
+  const isFinal = attempt >= maxAttempts;
+  const beforeFinal = attempt === maxAttempts - 1;
+  const left = maxAttempts - attempt;
+
+  const ruLetters = (n) => {
+    if (n === 1) return 'первую букву названия';
+    return `первые ${n} буквы названия`;
+  };
+  const azLetters = (n) => `başlığın ilk ${n} hərfini`;
+  const enLetters = (n) => (n === 1 ? 'the 1st letter of the title' : `the first ${n} letters of the title`);
+
+  if (L === 'az') {
+    if (meta.useLetters) {
+      const piece = azLetters(meta.n);
+      if (isFinal) return `Son bildiriş: push.az-da ${piece} yaz — təsdiq yalnız orada`;
+      if (beforeFinal) return `Növbəti son cəhd olacaq. push.az: ${piece} yaz`;
+      return `Təsdiq yalnız push.az-da: ${piece} yaz`;
+    }
+    if (isFinal) return 'Son bildiriş: push.az-da ekrandakı rəqəmi seç';
+    if (beforeFinal) return 'Növbəti son cəhd. push.az: ekrandakı rəqəm';
+    return 'Təsdiq yalnız push.az-da: ekrandakı rəqəmi seç';
+  }
+
+  if (L === 'en') {
+    if (meta.useLetters) {
+      const piece = enLetters(meta.n);
+      if (isFinal) return `Final ping: open push.az — type ${piece} (only there)`;
+      if (beforeFinal) return `Next is the last round. push.az: type ${piece}`;
+      if (attempt >= 3 && left <= 2) return `${left} push${left === 1 ? '' : 'es'} left — open push.az, type ${piece}`;
+      return `Confirm only in push.az: type ${piece}`;
+    }
+    if (isFinal) return 'Final ping: open push.az — tap the digit shown';
+    if (beforeFinal) return 'Next round is the last. push.az: tap the digit';
+    if (attempt >= 3 && left <= 2) return `${left} push${left === 1 ? '' : 'es'} left — open push.az, tap the digit`;
+    return 'Confirm only in push.az: tap the digit shown';
+  }
+
+  // ru
+  if (meta.useLetters) {
+    const piece = ruLetters(meta.n);
+    if (isFinal) return `Последний пуш: открой push.az, введи ${piece} — «Готово» только там`;
+    if (beforeFinal) return `Дальше финал. push.az: введи ${piece}`;
+    if (attempt >= 3 && left <= 2) {
+      const leftRu = left === 1 ? 'Остался 1 повтор' : 'Осталось 2 повтора';
+      return `${leftRu}. push.az: ${piece}`;
+    }
+    return `Подтверждение только в push.az: введи ${piece}`;
+  }
+  if (isFinal) return 'Последний пуш: открой push.az — на экране цифра, без этого не снимется';
+  if (beforeFinal) return 'Дальше финал. push.az: цифра на экране';
+  if (attempt >= 3 && left <= 2) {
+    const leftRu = left === 1 ? 'Остался 1 повтор' : 'Осталось 2 повтора';
+    return `${leftRu}. push.az: цифра на экране`;
+  }
+  return 'Подтверждение только в push.az: цифра на экране';
+}
 
 function stablePickIndex(seedStr, modulo) {
   if (modulo <= 0) return 0;
@@ -381,21 +452,18 @@ const ATOM_COPY = {
     slip: 'Уже {n} мин после времени',
     soon: 'Через {n} мин срок',
     due: 'Было на {t}',
-    att: 'Попытка {a}/{m}',
   },
   az: {
     note: 'Qeyd:',
     slip: 'Vaxtdan {n} dəqiqə keçdi',
     soon: '{n} dəqiqəyə vaxt',
     due: 'Vaxt: {t}',
-    att: 'Cəhd {a}/{m}',
   },
   en: {
     note: 'Note:',
     slip: '{n} min past due',
     soon: 'due in {n} min',
     due: 'Was for {t}',
-    att: 'Attempt {a}/{m}',
   },
 };
 
@@ -425,7 +493,7 @@ export function pickValueAtom(reminder, attempt, maxAttempts, nowMs, lang = 'ru'
   if (overdueMin >= 1) candidates.push({ k: 'slip', n: overdueMin });
   else if (upcomingMin > 0) candidates.push({ k: 'soon', n: upcomingMin });
   if (dueStr) candidates.push({ k: 'due', t: dueStr });
-  if (attempt > 1) candidates.push({ k: 'att', a: attempt, m: maxAttempts });
+  // Popытka N/M uzhe v telе notifikatsii (sw.js) / v Telegram — ne dubliruem.
 
   if (candidates.length === 0) return '';
 
@@ -436,7 +504,6 @@ export function pickValueAtom(reminder, attempt, maxAttempts, nowMs, lang = 'ru'
   if (c.k === 'slip') return A.slip.replace('{n}', String(c.n));
   if (c.k === 'soon') return A.soon.replace('{n}', String(c.n));
   if (c.k === 'due') return A.due.replace('{t}', c.t);
-  if (c.k === 'att') return A.att.replace('{a}', String(c.a)).replace('{m}', String(c.m));
   return '';
 }
 
@@ -447,6 +514,7 @@ export async function buildPushBody(
   lang = 'ru',
   nowMs = Date.now(),
   maxAttempts = 5,
+  pendingCount = 0,
 ) {
   const L = pickLang(lang);
   let baseText = null;
@@ -458,11 +526,11 @@ export async function buildPushBody(
   const atom = pickValueAtom(reminder, attempt, maxAttempts, nowMs, L);
   if (atom) baseText = `${baseText} · ${atom}`;
 
-  if (attempt >= 2) {
-    const hints = OPEN_HINTS[L] || OPEN_HINTS.ru;
-    const hint = hints[Math.floor(Math.random() * hints.length)];
-    baseText = `${baseText} → ${hint}`;
-  }
+  const queueFrag = formatPendingQueueFragment(pendingCount, L);
+  if (queueFrag) baseText = `${baseText} · ${queueFrag}`;
+
+  const openHint = buildOpenAppHint(reminder, attempt, maxAttempts, L);
+  if (openHint) baseText = `${baseText} → ${openHint}`;
 
   if (baseText.length > 220) baseText = baseText.slice(0, 217) + '…';
 
