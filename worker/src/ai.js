@@ -221,7 +221,7 @@ const SYSTEM_PROMPTS = {
     '6. Без эмодзи, без CAPS LOCK, без тройных восклицательных знаков.\n' +
     '7. Стиль: ' + toneInstr + '.\n' +
     '8. Разнообразие. НЕ начинай всегда с «Напоминаю:».\n' +
-    '9. Если есть длинная заметка — один короткий крючок к задаче; не пересказывай заметку целиком (факты из неё система добавит отдельно).\n' +
+    '9. Пользователь увидит полный текст и заметку только в приложении — в пуше никаких списков фактов и «пользы», только лёгкий крючок по теме.\n' +
     'ПРИМЕРЫ:\n' +
     '  «Твоя задача отчёт ждёт тебя.»\n' +
     '  «Эй, пора начать отчёт.»\n' +
@@ -236,7 +236,7 @@ const SYSTEM_PROMPTS = {
     '6. Emoji yoxdur, CAPS LOCK yoxdur, üçlü nida işarəsi yoxdur.\n' +
     '7. Ton: ' + toneInstr + '.\n' +
     '8. Fərqli ol. Həmişə "Xatırladıram:" ilə başlama.\n' +
-    '9. Uzun qeyd varsa — qısa çəngəl; bütün qeydi təkrarlamayın (sistem ayrıca fakt əlavə edə bilər).\n' +
+    '9. Bütöv qeyd yalnız tətbiqdə göstərilir; bildirişdə fakt siyahısı yox, qısa çəngəl.\n' +
     'NÜMUNƏLƏR:\n' +
     '  "Sənin hesabat tapşırığın səni gözləyir."\n' +
     '  "Hey, hesabata başlamaq vaxtıdır."\n' +
@@ -251,26 +251,21 @@ const SYSTEM_PROMPTS = {
     '6. No emoji, no CAPS LOCK, no triple exclamation marks.\n' +
     '7. Style: ' + toneInstr + '.\n' +
     '8. Be varied. Do NOT always start with "Reminder:".\n' +
-    '9. If there is a long note — one short hook; do not paste the whole note (the system may add factual detail separately).\n' +
+    '9. The full note appears only in the app — the push is a light hook, not a summary of the note.\n' +
     'EXAMPLES:\n' +
     '  "Your report is waiting for you."\n' +
     '  "Hey, time to start the report."\n' +
     '  "Report — perfect time."',
 };
 
+// Polnyy tekst zametki — tol'ko v PWA (takeover), ne v tele pushe.
 const USER_PROMPTS = {
   ru: (reminder, attempt) =>
-    `Задача: ${reminder.title}` +
-    (reminder.note ? `. Контекст: ${reminder.note}` : '') +
-    `. Попытка: ${attempt}. Напиши одну свежую строку-напоминание на русском. Не дублируй длинную заметку дословно.`,
+    `Задача: ${reminder.title}. Попытка: ${attempt}. Напиши одну короткую строку-напоминание на русском. Без дословного пересказа длинного текста (он есть только в приложении).`,
   az: (reminder, attempt) =>
-    `Tapşırıq: ${reminder.title}` +
-    (reminder.note ? `. Kontekst: ${reminder.note}` : '') +
-    `. Cəhd: ${attempt}. Azərbaycan dilində bir yeni xatırlatma sətri yaz. Uzun qeydi söz-söz təkrarlamayın.`,
+    `Tapşırıq: ${reminder.title}. Cəhd: ${attempt}. Azərbaycan dilində qısa bir sətir yaz. Uzun qeyd mətni yalnız tətbiqdədir, bura kopyalama.`,
   en: (reminder, attempt) =>
-    `Task: ${reminder.title}` +
-    (reminder.note ? `. Context: ${reminder.note}` : '') +
-    `. Attempt: ${attempt}. Write one fresh reminder line in English. Do not quote the whole note verbatim.`,
+    `Task: ${reminder.title}. Attempt: ${attempt}. Write one short reminder line. Do not paste the long note (full note is only in the app).`,
 };
 
 export async function generateAIText(ai, reminder, attempt, lang = 'ru') {
@@ -310,211 +305,18 @@ export async function generateAIText(ai, reminder, attempt, lang = 'ru') {
 
 // ============================================================================
 // Finalьnaya sborka pusha
+// — Odna korotkaya stroka (AI ili shablon). Polnaya zametka i podtverzhdeniye — v PWA.
+// — Parametry _nowMs, _maxAttempts, _pendingCount: sovmestimost' s vyzovom v index.js.
 // ============================================================================
-
-/** Skol'ko bukv v challenge — dolzhno sovpadat' s app.js CHALLENGE_LETTER_COUNT */
-const CHALLENGE_LETTER_COUNT = 3;
-
-/**
- * Pervyye N bukv iz nazvaniya (\p{L}), kak v renderLetterChallenge.
- * Esli bukv net — v prilozhenii budet cifrovoy challenge.
- */
-function letterChallengeMetaFromTitle(title) {
-  const letters = [];
-  for (const ch of String(title || '').normalize('NFC').trim()) {
-    if (/\p{L}/u.test(ch)) {
-      letters.push(ch);
-      if (letters.length >= CHALLENGE_LETTER_COUNT) break;
-    }
-  }
-  return { n: letters.length, useLetters: letters.length > 0 };
-}
-
-function formatPendingQueueFragment(pendingCount, lang) {
-  if (pendingCount <= 1) return '';
-  const x = pendingCount - 1;
-  if (lang === 'az') {
-    return x === 1 ? '1 başqa xatırlatma da gözləyir' : `${x} başqa xatırlatma da gözləyir`;
-  }
-  if (lang === 'en') {
-    return x === 1 ? '1 more reminder waiting' : `${x} more reminders waiting`;
-  }
-  if (x === 1) return 'ещё 1 напоминание ждёт';
-  if (x >= 2 && x <= 4) return `ещё ${x} напоминания ждут`;
-  return `ещё ${x} напоминаний ждут`;
-}
-
-/**
- * Konkretnaya instruktsiya: pochemu nuzhno otkryt' app (challenge nel'zya iz notifikatsii).
- */
-function buildOpenAppHint(reminder, attempt, maxAttempts, lang) {
-  const L = pickLang(lang);
-  const meta = letterChallengeMetaFromTitle(reminder.title);
-  const isFinal = attempt >= maxAttempts;
-  const beforeFinal = attempt === maxAttempts - 1;
-  const left = maxAttempts - attempt;
-
-  const ruLetters = (n) => {
-    if (n === 1) return 'первую букву названия';
-    return `первые ${n} буквы названия`;
-  };
-  const azLetters = (n) => `başlığın ilk ${n} hərfini`;
-  const enLetters = (n) => (n === 1 ? 'the 1st letter of the title' : `the first ${n} letters of the title`);
-
-  if (L === 'az') {
-    if (meta.useLetters) {
-      const piece = azLetters(meta.n);
-      if (isFinal) return `Son bildiriş: push.az-da ${piece} yaz — təsdiq yalnız orada`;
-      if (beforeFinal) return `Növbəti son cəhd olacaq. push.az: ${piece} yaz`;
-      return `Təsdiq yalnız push.az-da: ${piece} yaz`;
-    }
-    if (isFinal) return 'Son bildiriş: push.az-da ekrandakı rəqəmi seç';
-    if (beforeFinal) return 'Növbəti son cəhd. push.az: ekrandakı rəqəm';
-    return 'Təsdiq yalnız push.az-da: ekrandakı rəqəmi seç';
-  }
-
-  if (L === 'en') {
-    if (meta.useLetters) {
-      const piece = enLetters(meta.n);
-      if (isFinal) return `Final ping: open push.az — type ${piece} (only there)`;
-      if (beforeFinal) return `Next is the last round. push.az: type ${piece}`;
-      if (attempt >= 3 && left <= 2) return `${left} push${left === 1 ? '' : 'es'} left — open push.az, type ${piece}`;
-      return `Confirm only in push.az: type ${piece}`;
-    }
-    if (isFinal) return 'Final ping: open push.az — tap the digit shown';
-    if (beforeFinal) return 'Next round is the last. push.az: tap the digit';
-    if (attempt >= 3 && left <= 2) return `${left} push${left === 1 ? '' : 'es'} left — open push.az, tap the digit`;
-    return 'Confirm only in push.az: tap the digit shown';
-  }
-
-  // ru
-  if (meta.useLetters) {
-    const piece = ruLetters(meta.n);
-    if (isFinal) return `Последний пуш: открой push.az, введи ${piece} — «Готово» только там`;
-    if (beforeFinal) return `Дальше финал. push.az: введи ${piece}`;
-    if (attempt >= 3 && left <= 2) {
-      const leftRu = left === 1 ? 'Остался 1 повтор' : 'Осталось 2 повтора';
-      return `${leftRu}. push.az: ${piece}`;
-    }
-    return `Подтверждение только в push.az: введи ${piece}`;
-  }
-  if (isFinal) return 'Последний пуш: открой push.az — на экране цифра, без этого не снимется';
-  if (beforeFinal) return 'Дальше финал. push.az: цифра на экране';
-  if (attempt >= 3 && left <= 2) {
-    const leftRu = left === 1 ? 'Остался 1 повтор' : 'Осталось 2 повтора';
-    return `${leftRu}. push.az: цифра на экране`;
-  }
-  return 'Подтверждение только в push.az: цифра на экране';
-}
-
-function stablePickIndex(seedStr, modulo) {
-  if (modulo <= 0) return 0;
-  let h = 0;
-  const s = String(seedStr);
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h) % modulo;
-}
-
-function stripNote(note) {
-  return String(note || '')
-    .replace(/[\r\n\t]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function clipForAtom(s, maxLen) {
-  const t = stripNote(s);
-  if (t.length <= maxLen) return t;
-  return t.slice(0, Math.max(0, maxLen - 1)) + '…';
-}
-
-function formatDueShort(fireAtMs, lang) {
-  const n = Number(fireAtMs);
-  if (!Number.isFinite(n) || n <= 0) return '';
-  try {
-    const d = new Date(n);
-    const loc = lang === 'az' ? 'az-AZ' : lang === 'en' ? 'en-US' : 'ru-RU';
-    return d.toLocaleString(loc, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return '';
-  }
-}
-
-/** Korotkiye stroki «atomа pol'zy» — tol'ko iz dannykh reminderа. */
-const ATOM_COPY = {
-  ru: {
-    note: 'Заметка:',
-    slip: 'Уже {n} мин после времени',
-    soon: 'Через {n} мин срок',
-    due: 'Было на {t}',
-  },
-  az: {
-    note: 'Qeyd:',
-    slip: 'Vaxtdan {n} dəqiqə keçdi',
-    soon: '{n} dəqiqəyə vaxt',
-    due: 'Vaxt: {t}',
-  },
-  en: {
-    note: 'Note:',
-    slip: '{n} min past due',
-    soon: 'due in {n} min',
-    due: 'Was for {t}',
-  },
-};
-
-/**
- * Odin fakt iz title/note/fire_at/attempt — bez vyduмок, dlya bolee «novogo» pushego.
- */
-export function pickValueAtom(reminder, attempt, maxAttempts, nowMs, lang = 'ru') {
-  const L = pickLang(lang);
-  const A = ATOM_COPY[L] || ATOM_COPY.ru;
-  const fire = Number(reminder.fire_at);
-  const noteFull = stripNote(reminder.note);
-  const noteClip = noteFull.length >= 3 ? clipForAtom(noteFull, 52) : '';
-
-  const overdueMin =
-    Number.isFinite(fire) && fire > 0 && nowMs >= fire
-      ? Math.min(24 * 60, Math.max(1, Math.floor((nowMs - fire) / 60000)))
-      : 0;
-  const upcomingMin =
-    Number.isFinite(fire) && fire > 0 && nowMs < fire
-      ? Math.max(1, Math.ceil((fire - nowMs) / 60000))
-      : 0;
-
-  const dueStr = Number.isFinite(fire) && fire > 0 ? formatDueShort(fire, L) : '';
-
-  const candidates = [];
-  if (noteClip.length >= 3) candidates.push({ k: 'note', v: noteClip });
-  if (overdueMin >= 1) candidates.push({ k: 'slip', n: overdueMin });
-  else if (upcomingMin > 0) candidates.push({ k: 'soon', n: upcomingMin });
-  if (dueStr) candidates.push({ k: 'due', t: dueStr });
-  // Popытka N/M uzhe v telе notifikatsii (sw.js) / v Telegram — ne dubliruem.
-
-  if (candidates.length === 0) return '';
-
-  const idx = stablePickIndex(String(reminder.id) + '|' + attempt, candidates.length);
-  const c = candidates[idx];
-
-  if (c.k === 'note') return `${A.note} ${c.v}`;
-  if (c.k === 'slip') return A.slip.replace('{n}', String(c.n));
-  if (c.k === 'soon') return A.soon.replace('{n}', String(c.n));
-  if (c.k === 'due') return A.due.replace('{t}', c.t);
-  return '';
-}
 
 export async function buildPushBody(
   env,
   reminder,
   attempt,
   lang = 'ru',
-  nowMs = Date.now(),
-  maxAttempts = 5,
-  pendingCount = 0,
+  _nowMs = Date.now(),
+  _maxAttempts = 5,
+  _pendingCount = 0,
 ) {
   const L = pickLang(lang);
   let baseText = null;
@@ -522,17 +324,6 @@ export async function buildPushBody(
     baseText = await generateAIText(env.AI, reminder, attempt, L);
   }
   if (!baseText) baseText = pickFallbackText(reminder, attempt, L);
-
-  const atom = pickValueAtom(reminder, attempt, maxAttempts, nowMs, L);
-  if (atom) baseText = `${baseText} · ${atom}`;
-
-  const queueFrag = formatPendingQueueFragment(pendingCount, L);
-  if (queueFrag) baseText = `${baseText} · ${queueFrag}`;
-
-  const openHint = buildOpenAppHint(reminder, attempt, maxAttempts, L);
-  if (openHint) baseText = `${baseText} → ${openHint}`;
-
-  if (baseText.length > 220) baseText = baseText.slice(0, 217) + '…';
-
+  if (baseText.length > 180) baseText = baseText.slice(0, 177) + '…';
   return { text: baseText, challenge: null };
 }
