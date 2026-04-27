@@ -40,6 +40,7 @@ const BOT_I18N = {
     final_hint: 'Больше пушей не будет. Открой push.az и подтверди.',
     attempt_line: (a, m) => `Попытка ${a}/${m}`,
     news_hook: 'Между делом',
+    news_hooks: ['Между делом', 'На пару секунд в сторону', 'Короткая заметка', 'Факт дня'],
     btn_done: '✅ Готово',
     btn_10: '⏰ +10 мин',
     btn_30: '⏰ +30 мин',
@@ -77,6 +78,7 @@ const BOT_I18N = {
     final_hint: 'Artıq push gəlməyəcək. push.az-ı aç və təsdiq et.',
     attempt_line: (a, m) => `Cəhd ${a}/${m}`,
     news_hook: 'Qısa xəbər',
+    news_hooks: ['Qısa xəbər', 'Bir dəqiqəlik fasilə', 'Kiçik müşahidə', 'Günün faktı'],
     btn_done: '✅ Edildi',
     btn_10: '⏰ +10 dəq',
     btn_30: '⏰ +30 dəq',
@@ -114,6 +116,7 @@ const BOT_I18N = {
     final_hint: "No more pushes. Open push.az and confirm.",
     attempt_line: (a, m) => `Attempt ${a}/${m}`,
     news_hook: 'Quick read',
+    news_hooks: ['Quick read', 'Side note', 'Tiny fact', 'Worth peeking'],
     btn_done: '✅ Done',
     btn_10: '⏰ +10 min',
     btn_30: '⏰ +30 min',
@@ -201,6 +204,13 @@ async function tgEditMessage(env, chatId, messageId, text, extra = {}) {
 
 const TONE_EMOJI = { friendly: '💜', urgent: '⚡️', funny: '😆', aggressive: '🔥' };
 
+function tgMixHash(s) {
+  let h = 0;
+  const str = String(s);
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 export function formatReminderMessage(reminder, bodyText, attempt, maxAttempts, lang = 'ru', newsText = null) {
   const L = dict(lang);
   const isFinal = attempt >= maxAttempts;
@@ -208,8 +218,13 @@ export function formatReminderMessage(reminder, bodyText, attempt, maxAttempts, 
   const rawTitle = isFinal ? L.final_prefix(reminder.title) : reminder.title;
   const title = escMd(rawTitle);
   const body = escMd(bodyText);
+  let hookHead = L.news_hook;
+  if (newsText && Array.isArray(L.news_hooks) && L.news_hooks.length) {
+    const ix = tgMixHash(`${reminder.id}|${attempt}|${newsText}|${bodyText}`) % L.news_hooks.length;
+    hookHead = L.news_hooks[ix];
+  }
   const newsBlock = newsText
-    ? `\n\n*${escMd(L.news_hook)}*\n_${escMd(newsText)}_`
+    ? `\n\n*${escMd(hookHead)}*\n_${escMd(newsText)}_`
     : '';
   const note = reminder.note ? `\n\n_${escMd(reminder.note)}_` : '';
   const header = isFinal ? `\n\n${escMd(L.final_hint)}` : '';

@@ -630,6 +630,8 @@ async function processOneReminder(env, r, vapid, now) {
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
   const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount, {
     newsCategories,
+    // Unikal'nost' na kazhdyy konkretnyy "vykhod" schedulera (eskalyatsii, srezы povtora)
+    newsSeedExtra: [r.next_attempt_at, r.send_count, r.fire_at, r.updated_at].map(String).join(':'),
   });
   const newsLine = built.newsLine || null;
 

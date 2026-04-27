@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v29';
+const CACHE = 'push-az-v30';
 const ASSETS = [
   '/',
   '/index.html',
@@ -98,6 +98,7 @@ const SW_I18N = {
     default_notif_body: 'Уведомление',
     final_prefix: '🚨 ПОСЛЕДНИЙ ЗВОНОК — ',
     news_line_prefix: 'Между делом:',
+    news_line_prefixes: ['Между делом:', 'К слову:', 'Коротко:', 'На заметку:'],
     action_open: 'Открыть и подтвердить',
     action_snooze: 'Отложить 10 мин',
   },
@@ -106,6 +107,7 @@ const SW_I18N = {
     default_notif_body: 'Bildiriş',
     final_prefix: '🚨 SON ZƏNG — ',
     news_line_prefix: 'Qısa xəbər:',
+    news_line_prefixes: ['Qısa xəbər:', 'Qısaca:', 'Maraq üçün:', 'Qeyd:'],
     action_open: 'Aç və təsdiq et',
     action_snooze: '10 dəq təxirə',
   },
@@ -114,6 +116,7 @@ const SW_I18N = {
     default_notif_body: 'Notification',
     final_prefix: '🚨 FINAL CALL — ',
     news_line_prefix: 'Quick read:',
+    news_line_prefixes: ['Quick read:', 'Side note:', 'FYI:', 'Tiny fact:'],
     action_open: 'Open and confirm',
     action_snooze: 'Snooze 10 min',
   },
@@ -206,7 +209,11 @@ self.addEventListener('push', (event) => {
   const newsLine =
     typeof data.newsLine === 'string' && data.newsLine.trim() ? data.newsLine.trim() : '';
   if (isReminder && newsLine) {
-    const np = (L.news_line_prefix && L.news_line_prefix + ' ') || '';
+    const prefixes = Array.isArray(L.news_line_prefixes) && L.news_line_prefixes.length
+      ? L.news_line_prefixes
+      : [L.news_line_prefix || ''];
+    const pi = swStableIndex(`${rKey}:${newsLine}`, prefixes.length);
+    const np = (prefixes[pi] && prefixes[pi] + ' ') || '';
     composedBody = `${composedBody}\n${np}${newsLine}`;
   }
   if (composedBody.length > 420) {

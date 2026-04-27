@@ -323,7 +323,7 @@ export async function buildPushBody(
 ) {
   const L = pickLang(lang);
   const opts = options && typeof options === 'object' ? options : {};
-  const { newsCategories = [] } = opts;
+  const { newsCategories = [], newsSeedExtra = '' } = opts;
   let baseText = null;
   if (env.ENABLE_AI_GENERATION === 'true' && env.AI) {
     baseText = await generateAIText(env.AI, reminder, attempt, L);
@@ -333,7 +333,7 @@ export async function buildPushBody(
 
   let newsLine = null;
   if (Array.isArray(newsCategories) && newsCategories.length) {
-    const seed = `${reminder.id}:${attempt}:${_nowMs}`;
+    const seed = `${reminder.id}:${attempt}:${_nowMs}|${String(newsSeedExtra || '')}`;
     newsLine = pickNewsLine(L, newsCategories, seed);
   }
   return { text: baseText, newsLine, challenge: null };
