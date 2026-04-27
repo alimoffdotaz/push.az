@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v28';
+const CACHE = 'push-az-v29';
 const ASSETS = [
   '/',
   '/index.html',
@@ -97,6 +97,7 @@ const SW_I18N = {
     default_body: 'Пора!',
     default_notif_body: 'Уведомление',
     final_prefix: '🚨 ПОСЛЕДНИЙ ЗВОНОК — ',
+    news_line_prefix: 'Между делом:',
     action_open: 'Открыть и подтвердить',
     action_snooze: 'Отложить 10 мин',
   },
@@ -104,6 +105,7 @@ const SW_I18N = {
     default_body: 'Vaxtıdır!',
     default_notif_body: 'Bildiriş',
     final_prefix: '🚨 SON ZƏNG — ',
+    news_line_prefix: 'Qısa xəbər:',
     action_open: 'Aç və təsdiq et',
     action_snooze: '10 dəq təxirə',
   },
@@ -111,6 +113,7 @@ const SW_I18N = {
     default_body: 'Time!',
     default_notif_body: 'Notification',
     final_prefix: '🚨 FINAL CALL — ',
+    news_line_prefix: 'Quick read:',
     action_open: 'Open and confirm',
     action_snooze: 'Snooze 10 min',
   },
@@ -199,8 +202,19 @@ self.addEventListener('push', (event) => {
   const rKey = String(reminderId || (data.tag != null && data.tag !== '' ? `tag-${data.tag}` : 'push'));
   const { icon, badge, image } = pickNotificationVisuals(rKey, attempt, isFinal, urgent);
 
+  let composedBody = data.body || L.default_body;
+  const newsLine =
+    typeof data.newsLine === 'string' && data.newsLine.trim() ? data.newsLine.trim() : '';
+  if (isReminder && newsLine) {
+    const np = (L.news_line_prefix && L.news_line_prefix + ' ') || '';
+    composedBody = `${composedBody}\n${np}${newsLine}`;
+  }
+  if (composedBody.length > 420) {
+    composedBody = composedBody.slice(0, 417) + '...';
+  }
+
   const options = {
-    body: data.body || L.default_body,
+    body: composedBody,
     icon,
     badge,
     ...(isReminder && image ? { image } : {}),

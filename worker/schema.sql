@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
   display_name  TEXT,                           -- chelovecheskoye imya, opcional'no
   created_at    INTEGER NOT NULL,
   last_login_at INTEGER NOT NULL,
-  lang          TEXT    NOT NULL DEFAULT 'ru'   -- predpochtitel'nyy yazyk: ru | az | en
+  lang              TEXT    NOT NULL DEFAULT 'ru',   -- predpochtitel'nyy yazyk: ru | az | en
+  news_categories  TEXT    NOT NULL DEFAULT '[]'    -- JSON: massiv kategorij (tech, science, …)
 );
 
 -- WebAuthn credentials (passkeys)

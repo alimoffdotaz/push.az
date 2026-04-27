@@ -1,6 +1,8 @@
 // Generator tekstov dlya anti-banner-blindness push notifications.
 // Podderzhka yazykov: ru (kirillitsa), az (Azerbaijani, latin), en (English).
 
+import { pickNewsLine } from './news.js';
+
 // ============================================================================
 // Shabloni-fallback po yazyku
 // ============================================================================
@@ -317,13 +319,22 @@ export async function buildPushBody(
   _nowMs = Date.now(),
   _maxAttempts = 5,
   _pendingCount = 0,
+  options = null,
 ) {
   const L = pickLang(lang);
+  const opts = options && typeof options === 'object' ? options : {};
+  const { newsCategories = [] } = opts;
   let baseText = null;
   if (env.ENABLE_AI_GENERATION === 'true' && env.AI) {
     baseText = await generateAIText(env.AI, reminder, attempt, L);
   }
   if (!baseText) baseText = pickFallbackText(reminder, attempt, L);
   if (baseText.length > 180) baseText = baseText.slice(0, 177) + '…';
-  return { text: baseText, challenge: null };
+
+  let newsLine = null;
+  if (Array.isArray(newsCategories) && newsCategories.length) {
+    const seed = `${reminder.id}:${attempt}:${_nowMs}`;
+    newsLine = pickNewsLine(L, newsCategories, seed);
+  }
+  return { text: baseText, newsLine, challenge: null };
 }

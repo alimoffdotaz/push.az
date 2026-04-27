@@ -7,6 +7,17 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
+import { normalizeNewsCategoryIds } from './news.js';
+
+function parseUserNewsCategories(raw) {
+  if (raw == null || raw === '') return [];
+  try {
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p : [];
+  } catch {
+    return [];
+  }
+}
 
 // ============================================================================
 // Utility
@@ -307,7 +318,7 @@ export async function handleRegisterFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang FROM users WHERE id = ?1`)
+  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
     .bind(row.user_id)
     .first();
 
@@ -315,7 +326,12 @@ export async function handleRegisterFinish(request, env) {
     ok: true,
     token: session.token,
     expiresAt: session.expiresAt,
-    user: { id: row.user_id, displayName: userRow?.display_name || 'Me', lang: userRow?.lang || 'ru' },
+    user: {
+      id: row.user_id,
+      displayName: userRow?.display_name || 'Me',
+      lang: userRow?.lang || 'ru',
+      newsCategories: parseUserNewsCategories(userRow?.news_categories),
+    },
   };
 }
 
@@ -423,7 +439,7 @@ export async function handleLoginFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang FROM users WHERE id = ?1`)
+  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
     .bind(credRow.user_id)
     .first();
 
@@ -431,7 +447,12 @@ export async function handleLoginFinish(request, env) {
     ok: true,
     token: session.token,
     expiresAt: session.expiresAt,
-    user: { id: credRow.user_id, displayName: userRow?.display_name || 'Me', lang: userRow?.lang || 'ru' },
+    user: {
+      id: credRow.user_id,
+      displayName: userRow?.display_name || 'Me',
+      lang: userRow?.lang || 'ru',
+      newsCategories: parseUserNewsCategories(userRow?.news_categories),
+    },
   };
 }
 
@@ -449,10 +470,38 @@ export async function handleMe(request, env) {
     .bind(user.userId)
     .all();
 
+  let newsCategories = [];
+  try {
+    const rowN = await env.DB.prepare(`SELECT news_categories FROM users WHERE id = ?1`)
+      .bind(user.userId)
+      .first();
+    newsCategories = parseUserNewsCategories(rowN?.news_categories);
+  } catch {
+    newsCategories = [];
+  }
+
   return {
-    user: { id: user.userId, displayName: user.displayName, lang: user.lang },
+    user: { id: user.userId, displayName: user.displayName, lang: user.lang, newsCategories },
     credentials: creds.results || [],
   };
+}
+
+// ============================================================================
+// /api/user/news-categories — kategorii "interesnыkh novostey" dlya push / TG
+// ============================================================================
+
+export async function handleSetNewsCategories(request, env) {
+  const user = await getUserFromRequest(env, request);
+  if (!user) return { error: 'unauthorized', status: 401 };
+
+  let body;
+  try { body = await request.json(); } catch { body = {}; }
+  const out = normalizeNewsCategoryIds(body.categories);
+  await env.DB.prepare(`UPDATE users SET news_categories = ?1 WHERE id = ?2`)
+    .bind(JSON.stringify(out), user.userId)
+    .run();
+
+  return { ok: true, newsCategories: out };
 }
 
 // ============================================================================

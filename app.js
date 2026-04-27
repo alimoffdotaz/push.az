@@ -79,6 +79,18 @@ function repeatLabel(repeat) {
 const TONE_EMOJI = { friendly: '\ud83d\udc9c', urgent: '\u26a1', funny: '\ud83d\ude06', aggressive: '\ud83d\udd25' };
 function toneLabel(tone) { return t('tone.' + (tone || 'friendly')); }
 
+/** Sovpadayet s `NEWS_CATEGORY_IDS` na vorkere. */
+const NEWS_CATEGORY_IDS = [
+  'tech',
+  'science',
+  'space',
+  'health',
+  'nature',
+  'culture',
+  'business',
+  'world',
+];
+
 // ============================================================================
 // Utilities
 // ============================================================================
@@ -610,6 +622,32 @@ function renderAccountSection() {
   const subEl = document.getElementById('settings-user-sub');
   if (nameEl) nameEl.textContent = state.user.displayName || 'User';
   if (subEl) subEl.textContent = 'ID: ' + (state.user.id || '').slice(0, 12) + '…';
+}
+
+function renderNewsCategories() {
+  const wrap = document.getElementById('settings-news-cats');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!state.user) return;
+  const selected = new Set(
+    Array.isArray(state.user.newsCategories) ? state.user.newsCategories : [],
+  );
+  for (const id of NEWS_CATEGORY_IDS) {
+    const label = document.createElement('label');
+    label.className = 'news-cat';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'news-cat';
+    input.value = id;
+    input.id = 'news-cat-' + id;
+    input.checked = selected.has(id);
+    const span = document.createElement('span');
+    span.setAttribute('data-i18n', 'settings.news_cat.' + id);
+    span.textContent = t('settings.news_cat.' + id);
+    label.appendChild(input);
+    label.appendChild(span);
+    wrap.appendChild(label);
+  }
 }
 
 // ============================================================================
@@ -1586,7 +1624,10 @@ async function openSettings() {
   if (langSel) langSel.value = getLang();
   const themeSel = document.getElementById('settings-theme');
   if (themeSel) themeSel.value = getStoredTheme();
+  const newsBox = document.getElementById('settings-news');
+  if (newsBox) newsBox.hidden = !state.user;
   renderAccountSection();
+  renderNewsCategories();
   renderTelegramSection();
   if (settingsDialog.showModal) settingsDialog.showModal();
   else settingsDialog.hidden = false;
@@ -1602,6 +1643,23 @@ async function saveSettings(e) {
   const langSel = document.getElementById('settings-lang');
   if (langSel && langSel.value && langSel.value !== getLang()) {
     await changeLang(langSel.value);
+  }
+  if (state.user && state.sessionToken) {
+    const grid = document.getElementById('settings-news-cats');
+    if (grid) {
+      const selected = Array.from(grid.querySelectorAll('input[name="news-cat"]:checked')).map(
+        (i) => i.value,
+      );
+      try {
+        const r = await api('/api/user/news-categories', { method: 'POST', body: { categories: selected } });
+        state.user = { ...state.user, newsCategories: r.newsCategories || [] };
+        await config.set('user', state.user);
+      } catch (err) {
+        toast(t('err.generic', { err: err?.message || err }), 'error');
+        closeSettings();
+        return;
+      }
+    }
   }
   if (Notification.permission === 'granted') {
     try { await ensurePushSubscription(); } catch {}

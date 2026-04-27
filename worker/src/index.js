@@ -11,6 +11,7 @@ import {
   handleAddPasskeyFinish,
   handleRemovePasskey,
   handleSetLang,
+  handleSetNewsCategories,
   getUserFromRequest,
 } from './auth.js';
 import {
@@ -139,6 +140,9 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/user/lang' && method === 'POST') {
     return authRoute(handleSetLang, request, env);
   }
+  if (path === '/api/user/news-categories' && method === 'POST') {
+    return authRoute(handleSetNewsCategories, request, env);
+  }
 
   // ---- Telegram webhook (publichniy, zashchishchyon po X-Telegram-Bot-Api-Secret-Token) ----
   if (path === '/api/telegram/webhook' && method === 'POST') {
@@ -224,6 +228,7 @@ async function handleRequest(request, env, ctx) {
         'POST   /api/auth/passkey/add/finish',
         'DELETE /api/auth/passkey/:id',
         'POST   /api/user/lang',
+        'POST   /api/user/news-categories',
         'POST   /api/subscribe',
         'POST   /api/unsubscribe',
         'GET    /api/reminders',
@@ -604,20 +609,34 @@ async function processOneReminder(env, r, vapid, now) {
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
-  // Yazyk pol'zovatelya (dlya AI, fallback'ov i Telegram formattera)
+  // Yazyk i kategorii "novostey" dlya push / TG
   let lang = 'ru';
+  let newsCategories = [];
   try {
-    const u = await env.DB.prepare(`SELECT lang FROM users WHERE id = ?1`).bind(r.user_id).first();
+    const u = await env.DB.prepare(`SELECT lang, news_categories FROM users WHERE id = ?1`)
+      .bind(r.user_id)
+      .first();
     if (u?.lang) lang = u.lang;
+    if (u?.news_categories) {
+      try {
+        const p = JSON.parse(u.news_categories);
+        if (Array.isArray(p)) newsCategories = p;
+      } catch {
+        newsCategories = [];
+      }
+    }
   } catch {}
 
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
-  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount);
+  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount, {
+    newsCategories,
+  });
+  const newsLine = built.newsLine || null;
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS);
+      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
@@ -634,6 +653,7 @@ async function processOneReminder(env, r, vapid, now) {
         reminderId: r.id,
         title: r.title,
         body: built.text,
+        newsLine: newsLine || undefined,
         attempt,
         maxAttempts: MAX_ATTEMPTS,
         fireAt: r.fire_at,

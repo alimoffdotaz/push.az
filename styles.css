@@ -846,6 +846,48 @@ html[data-theme="light"] .composer-dialog {
   padding: 20px;
 }
 
+.settings-news {
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.settings-news-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+}
+
+.settings-news .muted {
+  margin: 0 0 10px 0;
+}
+
+.settings-news-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+@media (max-width: 380px) {
+  .settings-news-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-news label.news-cat {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.35;
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-news label.news-cat input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 .settings-header {
   display: flex;
   align-items: center;

@@ -39,6 +39,7 @@ const BOT_I18N = {
     final_prefix: (title) => `ПОСЛЕДНИЙ ЗВОНОК — ${title}`,
     final_hint: 'Больше пушей не будет. Открой push.az и подтверди.',
     attempt_line: (a, m) => `Попытка ${a}/${m}`,
+    news_hook: 'Между делом',
     btn_done: '✅ Готово',
     btn_10: '⏰ +10 мин',
     btn_30: '⏰ +30 мин',
@@ -75,6 +76,7 @@ const BOT_I18N = {
     final_prefix: (title) => `SON ZƏNG — ${title}`,
     final_hint: 'Artıq push gəlməyəcək. push.az-ı aç və təsdiq et.',
     attempt_line: (a, m) => `Cəhd ${a}/${m}`,
+    news_hook: 'Qısa xəbər',
     btn_done: '✅ Edildi',
     btn_10: '⏰ +10 dəq',
     btn_30: '⏰ +30 dəq',
@@ -111,6 +113,7 @@ const BOT_I18N = {
     final_prefix: (title) => `FINAL CALL — ${title}`,
     final_hint: "No more pushes. Open push.az and confirm.",
     attempt_line: (a, m) => `Attempt ${a}/${m}`,
+    news_hook: 'Quick read',
     btn_done: '✅ Done',
     btn_10: '⏰ +10 min',
     btn_30: '⏰ +30 min',
@@ -198,17 +201,20 @@ async function tgEditMessage(env, chatId, messageId, text, extra = {}) {
 
 const TONE_EMOJI = { friendly: '💜', urgent: '⚡️', funny: '😆', aggressive: '🔥' };
 
-export function formatReminderMessage(reminder, bodyText, attempt, maxAttempts, lang = 'ru') {
+export function formatReminderMessage(reminder, bodyText, attempt, maxAttempts, lang = 'ru', newsText = null) {
   const L = dict(lang);
   const isFinal = attempt >= maxAttempts;
   const emoji = isFinal ? '🚨' : (TONE_EMOJI[reminder.tone] || '🔔');
   const rawTitle = isFinal ? L.final_prefix(reminder.title) : reminder.title;
   const title = escMd(rawTitle);
   const body = escMd(bodyText);
+  const newsBlock = newsText
+    ? `\n\n*${escMd(L.news_hook)}*\n_${escMd(newsText)}_`
+    : '';
   const note = reminder.note ? `\n\n_${escMd(reminder.note)}_` : '';
   const header = isFinal ? `\n\n${escMd(L.final_hint)}` : '';
   const attemptLine = attempt > 1 ? `\n\n_${escMd(L.attempt_line(attempt, maxAttempts))}_` : '';
-  return `${emoji} *${title}*\n\n${body}${note}${header}${attemptLine}`;
+  return `${emoji} *${title}*\n\n${body}${newsBlock}${note}${header}${attemptLine}`;
 }
 
 export function reminderInlineKeyboard(reminderId, lang = 'ru') {
@@ -251,7 +257,7 @@ async function getChatLang(env, chatId) {
   }
 }
 
-export async function tgSendReminderToUser(env, userId, reminder, bodyText, attempt, maxAttempts) {
+export async function tgSendReminderToUser(env, userId, reminder, bodyText, attempt, maxAttempts, newsText = null) {
   const chats = await env.DB.prepare(
     `SELECT chat_id FROM telegram_links WHERE user_id = ?1`,
   )
@@ -262,7 +268,7 @@ export async function tgSendReminderToUser(env, userId, reminder, bodyText, atte
   if (!list.length) return { sent: 0, failed: 0 };
 
   const lang = await getUserLang(env, userId);
-  const text = formatReminderMessage(reminder, bodyText, attempt, maxAttempts, lang);
+  const text = formatReminderMessage(reminder, bodyText, attempt, maxAttempts, lang, newsText);
   const keyboard = reminderInlineKeyboard(reminder.id, lang);
 
   let sent = 0;
