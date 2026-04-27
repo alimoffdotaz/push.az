@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v26';
+const CACHE = 'push-az-v28';
 const ASSETS = [
   '/',
   '/index.html',
@@ -11,6 +11,9 @@ const ASSETS = [
   '/manifest.webmanifest',
   '/icons/icon.svg',
   '/icons/icon-maskable.svg',
+  '/icons/icon-maskable-192.png',
+  '/icons/icon-maskable-256.png',
+  '/icons/icon-maskable-512.png',
   '/icons/icon-alert.svg',
   '/icons/icon-192.png',
   '/icons/icon-256.png',
@@ -117,6 +120,53 @@ function swDict(lang) {
   return SW_I18N[lang] || SW_I18N.ru;
 }
 
+/** Stabil'nyy indeks dlya rotatsii ikonok (odin i tot zhe push = tot zhe vizual). */
+function swStableIndex(seedStr, modulo) {
+  if (modulo <= 0) return 0;
+  let h = 0;
+  const s = String(seedStr);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h) % modulo;
+}
+
+const TONE_EMOJI = {
+  friendly: '💜',
+  urgent: '⚡',
+  funny: '😆',
+  aggressive: '🔥',
+};
+
+/** Ikonki malogo razmera — sm. /icons; cherez raznyye formy brenda. */
+const NOTIF_ICONS = [
+  '/icons/icon-512.png',
+  '/icons/icon-256.png',
+  '/icons/icon-192.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/icon-maskable-256.png',
+  '/icons/icon-maskable-192.png',
+  '/icons/icon-alert-512.png',
+];
+
+const NOTIF_BADGES = ['/icons/icon-192.png', '/icons/icon-maskable-192.png', '/icons/favicon-64.png'];
+
+/** Krupnoye izobrazheniye (Android Chrome); iOS chasto ignoriruyet. */
+const NOTIF_LARGE_IMAGES = ['/icons/icon-maskable-512.png', '/icons/icon-512.png', '/icons/icon-alert-512.png'];
+
+function pickNotificationVisuals(reminderId, attempt, isFinal, urgent) {
+  const key = `${reminderId}\0${attempt}`;
+  let icon = NOTIF_ICONS[swStableIndex(key, NOTIF_ICONS.length)];
+  if (isFinal) {
+    const finalPool = ['/icons/icon-alert-512.png', '/icons/icon-maskable-512.png'];
+    icon = finalPool[swStableIndex(key + ':f', finalPool.length)];
+  } else if (urgent) {
+    const urgentPool = ['/icons/icon-alert-512.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
+    icon = urgentPool[swStableIndex(key + ':u', urgentPool.length)];
+  }
+  const badge = NOTIF_BADGES[swStableIndex(key + ':b', NOTIF_BADGES.length)];
+  const image = NOTIF_LARGE_IMAGES[swStableIndex(key + ':i', NOTIF_LARGE_IMAGES.length)];
+  return { icon, badge, image };
+}
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -137,14 +187,23 @@ self.addEventListener('push', (event) => {
 
   const urgent = attempt >= 3;
   const isFinal = isReminder && attempt >= maxAttempts;
-  let title = data.title || 'push.az';
-  if (isFinal) title = L.final_prefix + title;
-  else if (urgent) title = title + ' \u203c';
+  const baseTitle = data.title || 'push.az';
+  const te =
+    isReminder && !isFinal && data.tone && TONE_EMOJI[data.tone] ? TONE_EMOJI[data.tone] + ' ' : '';
+  let title;
+  if (isFinal) title = L.final_prefix + baseTitle;
+  else if (urgent) title = baseTitle + ' \u203c';
+  else title = baseTitle;
+  if (te) title = te + title;
+
+  const rKey = String(reminderId || (data.tag != null && data.tag !== '' ? `tag-${data.tag}` : 'push'));
+  const { icon, badge, image } = pickNotificationVisuals(rKey, attempt, isFinal, urgent);
 
   const options = {
     body: data.body || L.default_body,
-    icon: urgent || isFinal ? '/icons/icon-alert-512.png' : '/icons/icon-512.png',
-    badge: '/icons/icon-192.png',
+    icon,
+    badge,
+    ...(isReminder && image ? { image } : {}),
     // Na finalnoy popytke ne kollapsirovat' s predyduschimi (unikalnyy tag)
     tag: isFinal
       ? 'push-az-final-' + (reminderId || 'generic')
@@ -157,6 +216,8 @@ self.addEventListener('push', (event) => {
       isFinal,
       receivedAt: Date.now(),
       challengeFailures: 0,
+      iconPath: icon,
+      imagePath: isReminder && image ? image : null,
     },
     silent: false,
   };
