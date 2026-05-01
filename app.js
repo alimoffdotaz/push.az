@@ -1739,7 +1739,7 @@ function setupSWMessageHandler() {
       if (!reminderId || reminderId === 'test') return;
       const r = state.reminders.find((x) => x.id === reminderId);
       if (r) {
-        r.fireAt = Date.now() + 10 * 60000;
+        r.fireAt = Number(msg.snoozedUntil || 0) || Date.now() + 10 * 60000;
         await db.put(r);
         render();
       }
