@@ -993,15 +993,11 @@ async function syncDeleteReminderToBackend(id) {
 }
 
 async function syncAckToBackend(reminderId, action = 'done', minutes = 10) {
-  if (!state.workerUrl) return;
-  try {
-    await api('/api/ack', {
-      method: 'POST',
-      body: { reminderId, action, minutes },
-    });
-  } catch (err) {
-    console.warn('sync ack failed:', err);
-  }
+  if (!state.workerUrl || !state.sessionToken) return null;
+  return api('/api/ack', {
+    method: 'POST',
+    body: { reminderId, action, minutes },
+  });
 }
 
 async function syncAllReminders() {
@@ -1333,7 +1329,9 @@ async function snoozeReminder(id, minutes) {
   await db.put(r);
   state.reminders.sort((a, b) => a.fireAt - b.fireAt);
   await scheduleLocalNotification(r);
-  syncAckToBackend(id, 'snooze', minutes);
+  syncAckToBackend(id, 'snooze', minutes).catch((err) => {
+    console.warn('sync snooze failed:', err);
+  });
   render();
   toast(t('toast.snoozed', { n: minutes }));
 }
@@ -1598,7 +1596,13 @@ async function takeoverConfirmDone() {
     // Vazhno: snachala ack na backend (sinkhrоnно), chtoby server
     // perevyol status v 'acked' i ne otdaval reminder v syncAllReminders
     // obratno s overdue fire_at \u2014 inache takeover pokazhetsya snova.
-    try { await syncAckToBackend(id, 'done'); } catch {}
+    try {
+      await syncAckToBackend(id, 'done');
+    } catch (err) {
+      console.warn('sync ack failed:', err);
+      toast(t('toast.failed', { err: err?.message || err }), 'error');
+      return;
+    }
     await db.delete(id);
     state.reminders = state.reminders.filter((x) => x.id !== id);
     await cancelLocalNotification(id);
@@ -1747,6 +1751,11 @@ function setupSWMessageHandler() {
       return;
     }
 
+    if (msg.type === 'reminder-ack-failed') {
+      toast(t('toast.failed', { err: 'ack' }), 'error');
+      return;
+    }
+
     // Legacy: esli pridyot staroye soobshcheniye reminder-acked \u2014 obrabotay tak zhe
     if (msg.type === 'reminder-acked') {
       if (!reminderId || reminderId === 'test') return;
@@ -1775,11 +1784,16 @@ function handleURLAction() {
   if (params.get('action') === 'ack') {
     const id = params.get('id');
     if (id) {
-      syncAckToBackend(id, 'done');
-      db.delete(id).then(() => {
-        state.reminders = state.reminders.filter((r) => r.id !== id);
-        render();
-      });
+      syncAckToBackend(id, 'done')
+        .then(() => db.delete(id))
+        .then(() => {
+          state.reminders = state.reminders.filter((r) => r.id !== id);
+          render();
+        })
+        .catch((err) => {
+          console.warn('sync ack failed:', err);
+          toast(t('toast.failed', { err: err?.message || err }), 'error');
+        });
     }
     history.replaceState({}, '', location.pathname);
   }
