@@ -301,7 +301,14 @@ self.addEventListener('notificationclick', (event) => {
 
       // === SNOOZE \u2014 edinstvennoye chto mozhno sdelat' iz samogo pusha ===
       if (action === 'snooze') {
-        if (isRealReminder) await callAck(reminderId, 'snooze', 10);
+        if (isRealReminder) {
+          const acked = await callAck(reminderId, 'snooze', 10);
+          if (!acked) {
+            await notifyClients({ type: 'open-challenge', reminderId });
+            await focusClient();
+            return;
+          }
+        }
         await notifyClients({ type: 'reminder-snoozed', reminderId });
         return;
       }
@@ -353,17 +360,21 @@ async function callAck(reminderId, action, minutes = 10) {
   try {
     const workerUrl = await config.get('workerUrl', '');
     const deviceId = await config.get('deviceId', '');
-    if (!workerUrl || !deviceId) return;
-    await fetch(workerUrl.replace(/\/+$/, '') + '/api/ack', {
+    const sessionToken = await config.get('sessionToken', '');
+    if (!workerUrl || !deviceId || !sessionToken) return false;
+    const res = await fetch(workerUrl.replace(/\/+$/, '') + '/api/ack', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Device-Id': deviceId,
+        Authorization: 'Bearer ' + sessionToken,
       },
       body: JSON.stringify({ reminderId, action, minutes }),
     });
+    return res.ok;
   } catch (err) {
     console.warn('[sw] ack failed:', err);
+    return false;
   }
 }
 
