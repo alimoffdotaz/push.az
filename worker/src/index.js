@@ -577,7 +577,7 @@ async function runScheduler(env) {
   }
 }
 
-async function processOneReminder(env, r, vapid, now) {
+export async function processOneReminder(env, r, vapid, now) {
   const attempt = (r.send_count || 0) + 1;
 
   if (attempt > MAX_ATTEMPTS) {
@@ -596,16 +596,6 @@ async function processOneReminder(env, r, vapid, now) {
     .bind(r.user_id)
     .all();
   const devices = devicesRows.results || [];
-
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
@@ -635,13 +625,26 @@ async function processOneReminder(env, r, vapid, now) {
   });
   const newsLine = built.newsLine || null;
 
+  let telegramOk = false;
+
   // Parallelno shlyom v Telegram (esli user'a privyazal)
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tgResult = await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      telegramOk = Number(tgResult?.sent || 0) > 0;
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
+  }
+
+  if (!devices.length && !telegramOk) {
+    // Net kanalov dostavki — prodvigayem next_attempt, chtoby ne molotit' scheduler kazhduyu minutu.
+    await env.DB.prepare(
+      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+    )
+      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
+      .run();
+    return;
   }
 
   let anyOk = false;
@@ -693,12 +696,14 @@ async function processOneReminder(env, r, vapid, now) {
     else anyNonGoneError = true;
   }
 
-  if (!anyOk && anyNonGoneError) {
+  const delivered = anyOk || telegramOk;
+
+  if (!delivered && anyNonGoneError) {
     // Vse popytki v etu iteratsiyu upali — ne prodvigayem schetchik
     return;
   }
-  if (!anyOk) {
-    // Vse device'y goneли
+  if (!delivered) {
+    // Vse device'y goneли, Telegram ne dostavil
     return;
   }
 
