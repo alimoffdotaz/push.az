@@ -548,8 +548,7 @@ const MAX_ATTEMPTS = 5;
 async function runScheduler(env) {
   const vapid = getVapidConfig(env);
   if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
-    return;
+    console.warn('[scheduler] VAPID not configured; Web Push disabled for this run');
   }
 
   const now = Date.now();
@@ -589,24 +588,6 @@ async function processOneReminder(env, r, vapid, now) {
     return;
   }
 
-  // Nakhodim vse aktivnye device'y polzovatelya
-  const devicesRows = await env.DB.prepare(
-    `SELECT * FROM devices WHERE user_id = ?1 AND revoked_at IS NULL`,
-  )
-    .bind(r.user_id)
-    .all();
-  const devices = devicesRows.results || [];
-
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
-
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
   // Yazyk i kategorii "novostey" dlya push / TG
@@ -636,18 +617,41 @@ async function processOneReminder(env, r, vapid, now) {
   const newsLine = built.newsLine || null;
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)
+  let telegramSent = false;
+  let telegramFailed = false;
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tgResult = await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      telegramSent = Number(tgResult?.sent || 0) > 0;
+      telegramFailed = Number(tgResult?.failed || 0) > 0;
     } catch (err) {
+      telegramFailed = true;
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
   }
 
-  let anyOk = false;
-  let anyNonGoneError = false;
+  // Nakhodim vse aktivnye device'y polzovatelya. Telegram delivery must not
+  // depend on Web Push subscriptions being present or healthy.
+  const devicesRows = await env.DB.prepare(
+    `SELECT * FROM devices WHERE user_id = ?1 AND revoked_at IS NULL`,
+  )
+    .bind(r.user_id)
+    .all();
+  const devices = devicesRows.results || [];
 
-  for (const d of devices) {
+  if (!devices.length && !telegramSent) {
+    await env.DB.prepare(
+      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+    )
+      .bind(now + 60 * 60_000, now, r.id)
+      .run();
+    return;
+  }
+
+  let anyOk = telegramSent;
+  let anyNonGoneError = telegramFailed;
+
+  for (const d of vapid ? devices : []) {
     const result = await sendWebPush(
       { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
       {
@@ -698,7 +702,12 @@ async function processOneReminder(env, r, vapid, now) {
     return;
   }
   if (!anyOk) {
-    // Vse device'y goneли
+    // Dostavit' nekuda: vse device'y gone, Web Push disabled, ili ne ostalos' zhivykh Telegram-chatov.
+    await env.DB.prepare(
+      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+    )
+      .bind(now + 60 * 60_000, now, r.id)
+      .run();
     return;
   }
 
@@ -763,3 +772,8 @@ function computeNextFireAt(prevFireAt, repeat, now) {
   } while (t <= now);
   return t;
 }
+
+export const __test = {
+  processOneReminder,
+  runScheduler,
+};
