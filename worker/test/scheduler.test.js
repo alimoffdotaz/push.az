@@ -122,3 +122,20 @@ test('scheduler backs off when no Web Push devices or Telegram chats can receive
     { type: 'backoff', args: [NOW + 60 * 60_000, NOW, 'rem-1'] },
   ]);
 });
+
+test('scheduler backs off when VAPID is missing and Telegram delivery fails', async (t) => {
+  t.mock.method(Date, 'now', () => NOW);
+  t.mock.method(globalThis, 'fetch', async () => {
+    return { json: async () => ({ ok: false, error_code: 500 }) };
+  });
+
+  const { env, updates } = createEnv({
+    devices: [{ id: 'dev-1', endpoint: 'https://push.example/send', p256dh: 'x', auth: 'y' }],
+  });
+
+  await __test.runScheduler(env);
+
+  assert.deepEqual(updates, [
+    { type: 'backoff', args: [NOW + 60 * 60_000, NOW, 'rem-1'] },
+  ]);
+});

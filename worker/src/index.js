@@ -650,8 +650,9 @@ async function processOneReminder(env, r, vapid, now) {
 
   let anyOk = telegramSent;
   let anyNonGoneError = telegramFailed;
+  const pushDevices = vapid ? devices : [];
 
-  for (const d of vapid ? devices : []) {
+  for (const d of pushDevices) {
     const result = await sendWebPush(
       { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
       {
@@ -698,6 +699,14 @@ async function processOneReminder(env, r, vapid, now) {
   }
 
   if (!anyOk && anyNonGoneError) {
+    if (!pushDevices.length) {
+      await env.DB.prepare(
+        `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+      )
+        .bind(now + 60 * 60_000, now, r.id)
+        .run();
+      return;
+    }
     // Vse popytki v etu iteratsiyu upali — ne prodvigayem schetchik
     return;
   }
