@@ -359,12 +359,23 @@ async function handleUpsertReminder(request, env, user) {
 
   // Yesli updateim — proverim vladel'tsa
   const existing = await env.DB.prepare(
-    `SELECT user_id FROM reminders WHERE id = ?1`,
+    `SELECT user_id, title, note, fire_at, repeat, tone FROM reminders WHERE id = ?1`,
   )
     .bind(id)
     .first();
   if (existing && existing.user_id && existing.user_id !== user.userId) {
     return jsonResponse({ error: 'forbidden' }, 403, request, env);
+  }
+  if (
+    existing &&
+    existing.user_id === user.userId &&
+    existing.title === title &&
+    (existing.note || '') === (note || '') &&
+    Number(existing.fire_at) === Number(fireAt) &&
+    (existing.repeat || 'none') === repeat &&
+    (existing.tone || 'friendly') === tone
+  ) {
+    return jsonResponse({ ok: true, id, unchanged: true }, 200, request, env);
   }
 
   const now = Date.now();
@@ -548,8 +559,7 @@ const MAX_ATTEMPTS = 5;
 async function runScheduler(env) {
   const vapid = getVapidConfig(env);
   if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
-    return;
+    console.warn('[scheduler] VAPID not configured, Web Push disabled for this run');
   }
 
   const now = Date.now();
@@ -597,16 +607,6 @@ async function processOneReminder(env, r, vapid, now) {
     .all();
   const devices = devicesRows.results || [];
 
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
-
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
   // Yazyk i kategorii "novostey" dlya push / TG
@@ -635,13 +635,25 @@ async function processOneReminder(env, r, vapid, now) {
   });
   const newsLine = built.newsLine || null;
 
+  let telegramDelivered = false;
+
   // Parallelno shlyom v Telegram (esli user'a privyazal)
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tgResult = await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      telegramDelivered = Number(tgResult?.sent || 0) > 0;
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
+  }
+
+  if (!vapid || !devices.length) {
+    if (telegramDelivered) {
+      await updateReminderAfterDeliveredAttempt(env, r, attempt, now);
+    } else {
+      await backoffReminderWithoutChannel(env, r.id, now);
+    }
+    return;
   }
 
   let anyOk = false;
@@ -694,14 +706,34 @@ async function processOneReminder(env, r, vapid, now) {
   }
 
   if (!anyOk && anyNonGoneError) {
-    // Vse popytki v etu iteratsiyu upali — ne prodvigayem schetchik
+    // Web Push upal, no Telegram uzhe dostavil reminder; ne shlyom ego snova kazhduyu minutu.
+    if (telegramDelivered) {
+      await updateReminderAfterDeliveredAttempt(env, r, attempt, now);
+    }
     return;
   }
   if (!anyOk) {
-    // Vse device'y goneли
+    // Vse device'y goneли. Telegram, esli srabotal, schitayem dostavkoy; inache net kanala.
+    if (telegramDelivered) {
+      await updateReminderAfterDeliveredAttempt(env, r, attempt, now);
+    } else {
+      await backoffReminderWithoutChannel(env, r.id, now);
+    }
     return;
   }
 
+  await updateReminderAfterDeliveredAttempt(env, r, attempt, now);
+}
+
+async function backoffReminderWithoutChannel(env, reminderId, now) {
+  await env.DB.prepare(
+    `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+  )
+    .bind(now + 60 * 60_000, now, reminderId)
+    .run();
+}
+
+async function updateReminderAfterDeliveredAttempt(env, r, attempt, now) {
   if (attempt >= MAX_ATTEMPTS) {
     if (r.repeat && r.repeat !== 'none') {
       const nextFire = computeNextFireAt(r.fire_at, r.repeat, now);
