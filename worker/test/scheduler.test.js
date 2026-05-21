@@ -84,6 +84,49 @@ test('scheduler backs off when no delivery channel is available', async () => {
   assert.equal(reminder.next_attempt_at, FIXED_NOW + 60 * 60_000);
 });
 
+test('unchanged reminder upsert does not reset scheduler state', async () => {
+  const reminder = makeReminder({
+    status: 'missed',
+    send_count: 5,
+    last_sent_at: FIXED_NOW - 500,
+    next_attempt_at: FIXED_NOW - 500,
+  });
+  const db = new FakeDB({
+    users: [{ id: 'user-1', display_name: 'Me', lang: 'en', news_categories: '[]' }],
+    sessions: [{
+      id: 'session-1',
+      user_id: 'user-1',
+      device_id: 'device-1',
+      expires_at: FIXED_NOW + 60_000,
+    }],
+    reminders: [reminder],
+  });
+
+  const response = await worker.fetch(new Request('https://worker.test/api/reminders', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer session-1',
+      'Content-Type': 'application/json',
+      'X-Device-Id': 'device-1',
+    },
+    body: JSON.stringify({
+      id: reminder.id,
+      title: reminder.title,
+      note: reminder.note,
+      fireAt: reminder.fire_at,
+      repeat: reminder.repeat,
+      tone: reminder.tone,
+    }),
+  }), { DB: db }, {});
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.unchanged, true);
+  assert.equal(reminder.status, 'missed');
+  assert.equal(reminder.send_count, 5);
+  assert.equal(reminder.next_attempt_at, FIXED_NOW - 500);
+});
+
 async function runScheduled(env) {
   let scheduled;
   worker.scheduled({}, env, { waitUntil: (promise) => { scheduled = promise; } });
@@ -185,8 +228,9 @@ function concatBytes(...parts) {
 }
 
 class FakeDB {
-  constructor({ users = [], devices = [], telegramLinks = [], reminders = [] } = {}) {
+  constructor({ users = [], sessions = [], devices = [], telegramLinks = [], reminders = [] } = {}) {
     this.users = users;
+    this.sessions = sessions;
     this.devices = devices;
     this.telegramLinks = telegramLinks;
     this.reminders = reminders;
@@ -235,6 +279,22 @@ class FakeStatement {
   }
 
   async first() {
+    if (this.sql.includes('FROM sessions s JOIN users u ON u.id = s.user_id')) {
+      const [token, now] = this.args;
+      const session = this.db.sessions.find((s) => s.id === token && s.expires_at > now);
+      if (!session) return null;
+      const user = this.db.users.find((u) => u.id === session.user_id);
+      if (!user) return null;
+      return {
+        ...session,
+        user_display_name: user.display_name || null,
+        user_lang: user.lang || 'ru',
+      };
+    }
+    if (this.sql.includes('SELECT user_id, title, note, fire_at, repeat, tone FROM reminders WHERE id')) {
+      const [id] = this.args;
+      return this.db.reminders.find((r) => r.id === id) || null;
+    }
     if (this.sql.includes('SELECT lang, news_categories FROM users WHERE id')) {
       const [userId] = this.args;
       return this.db.users.find((u) => u.id === userId) || null;

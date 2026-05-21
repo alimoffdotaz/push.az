@@ -359,12 +359,23 @@ async function handleUpsertReminder(request, env, user) {
 
   // Yesli updateim — proverim vladel'tsa
   const existing = await env.DB.prepare(
-    `SELECT user_id FROM reminders WHERE id = ?1`,
+    `SELECT user_id, title, note, fire_at, repeat, tone FROM reminders WHERE id = ?1`,
   )
     .bind(id)
     .first();
   if (existing && existing.user_id && existing.user_id !== user.userId) {
     return jsonResponse({ error: 'forbidden' }, 403, request, env);
+  }
+  if (
+    existing &&
+    existing.user_id === user.userId &&
+    existing.title === title &&
+    (existing.note || '') === (note || '') &&
+    Number(existing.fire_at) === Number(fireAt) &&
+    (existing.repeat || 'none') === repeat &&
+    (existing.tone || 'friendly') === tone
+  ) {
+    return jsonResponse({ ok: true, id, unchanged: true }, 200, request, env);
   }
 
   const now = Date.now();
