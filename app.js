@@ -965,7 +965,8 @@ function updatePushStatusPill() {
 // ============================================================================
 
 async function syncReminderToBackend(r) {
-  if (!state.workerUrl) return;
+  if (!state.workerUrl) return false;
+  const clientUpdatedAt = Number(r.updatedAt || r.createdAt || Date.now());
   try {
     await api('/api/reminders', {
       method: 'POST',
@@ -976,10 +977,28 @@ async function syncReminderToBackend(r) {
         fireAt: r.fireAt,
         repeat: r.repeat || 'none',
         tone: r.tone || 'friendly',
+        updatedAt: clientUpdatedAt,
       },
     });
+    const current = await db.get(r.id);
+    const currentUpdatedAt = Number(current?.updatedAt || current?.createdAt || 0);
+    if (current && currentUpdatedAt <= clientUpdatedAt) {
+      const synced = {
+        ...current,
+        updatedAt: current.updatedAt || clientUpdatedAt,
+        pendingSync: false,
+        syncedAt: Date.now(),
+      };
+      await db.put(synced);
+      const inState = state.reminders.find((x) => x.id === r.id);
+      if (inState && Number(inState.updatedAt || inState.createdAt || 0) <= clientUpdatedAt) {
+        Object.assign(inState, synced);
+      }
+    }
+    return true;
   } catch (err) {
     console.warn('sync reminder failed:', err);
+    return false;
   }
 }
 
@@ -993,14 +1012,16 @@ async function syncDeleteReminderToBackend(id) {
 }
 
 async function syncAckToBackend(reminderId, action = 'done', minutes = 10) {
-  if (!state.workerUrl) return;
+  if (!state.workerUrl) return false;
   try {
     await api('/api/ack', {
       method: 'POST',
       body: { reminderId, action, minutes },
     });
+    return true;
   } catch (err) {
     console.warn('sync ack failed:', err);
+    return false;
   }
 }
 
@@ -1009,11 +1030,21 @@ async function syncAllReminders() {
   if (!state.sessionToken) return;
   state.syncing = true;
   try {
-    // 1) Pull from server (vse user reminder'y so vsekh device'ev)
+    // 1) First upload dirty reminders so a later pull cannot delete them.
+    const beforePull = (await db.getAll()) || [];
+    for (const r of beforePull) {
+      if (r?.acked) continue;
+      if (r.pendingSync) {
+        await syncReminderToBackend(r);
+      }
+    }
+
+    // 2) Pull from server (vse user reminder'y so vsekh device'ev)
     try {
       const resp = await api('/api/reminders', { method: 'GET' });
       const serverRems = Array.isArray(resp?.reminders) ? resp.reminders : [];
       const byId = new Map();
+      const syncedAt = Date.now();
       for (const s of serverRems) {
         byId.set(s.id, {
           id: s.id,
@@ -1026,6 +1057,8 @@ async function syncAllReminders() {
           acked: s.status === 'acked' || !!s.acked_at,
           updatedAt: Number(s.updated_at) || Date.now(),
           createdAt: Number(s.created_at) || Date.now(),
+          pendingSync: false,
+          syncedAt,
         });
       }
 
@@ -1041,7 +1074,7 @@ async function syncAllReminders() {
       }
       // Udalyaem lokalnye reminder'y, kotorykh bolshe net na servere (udaleno s drugogo ustr.)
       for (const l of localAll) {
-        if (!byId.has(l.id)) {
+        if (!byId.has(l.id) && !l.pendingSync && l.syncedAt) {
           await db.delete(l.id);
         }
       }
@@ -1051,11 +1084,6 @@ async function syncAllReminders() {
       checkTakeover();
     } catch (err) {
       console.warn('sync pull failed', err);
-    }
-
-    // 2) Push local (dlya noviklyx reminder'ev, sozdannykh offline)
-    for (const r of state.reminders) {
-      try { await syncReminderToBackend(r); } catch {}
     }
   } finally {
     state.syncing = false;
@@ -1249,6 +1277,7 @@ async function addReminder(e) {
     return;
   }
 
+  const now = Date.now();
   const reminder = {
     id: uid(),
     title,
@@ -1256,7 +1285,9 @@ async function addReminder(e) {
     fireAt,
     repeat,
     tone,
-    createdAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
+    pendingSync: true,
   };
 
   try {
@@ -1329,7 +1360,10 @@ async function deleteReminder(id) {
 async function snoozeReminder(id, minutes) {
   const r = state.reminders.find((x) => x.id === id);
   if (!r) return;
+  const now = Date.now();
   r.fireAt = Date.now() + minutes * 60000;
+  r.updatedAt = now;
+  r.pendingSync = true;
   await db.put(r);
   state.reminders.sort((a, b) => a.fireAt - b.fireAt);
   await scheduleLocalNotification(r);
@@ -1739,8 +1773,12 @@ function setupSWMessageHandler() {
       if (!reminderId || reminderId === 'test') return;
       const r = state.reminders.find((x) => x.id === reminderId);
       if (r) {
-        r.fireAt = Date.now() + 10 * 60000;
+        const now = Date.now();
+        r.fireAt = now + 10 * 60000;
+        r.updatedAt = now;
+        r.pendingSync = true;
         await db.put(r);
+        await scheduleLocalNotification(r);
         render();
       }
       if (state.takeoverActive && takeoverEl?.dataset.reminderId === reminderId) hideTakeover();
@@ -1753,8 +1791,12 @@ function setupSWMessageHandler() {
       if (action === 'snooze') {
         const r = state.reminders.find((x) => x.id === reminderId);
         if (r) {
-          r.fireAt = Date.now() + 10 * 60000;
+          const now = Date.now();
+          r.fireAt = now + 10 * 60000;
+          r.updatedAt = now;
+          r.pendingSync = true;
           await db.put(r);
+          await scheduleLocalNotification(r);
           render();
         }
       }
