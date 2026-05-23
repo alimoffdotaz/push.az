@@ -545,11 +545,10 @@ async function countPendingRemindersForDevice(env, deviceId) {
 const ESCALATION_DELAYS_MIN = [2, 5, 10, 20]; // posle 1-y, 2-y, 3-y, 4-y popytki
 const MAX_ATTEMPTS = 5;
 
-async function runScheduler(env) {
+export async function runScheduler(env, options = {}) {
   const vapid = getVapidConfig(env);
   if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
-    return;
+    console.warn('[scheduler] VAPID not configured, web push disabled for this run');
   }
 
   const now = Date.now();
@@ -570,14 +569,16 @@ async function runScheduler(env) {
 
   for (const r of due) {
     try {
-      await processOneReminder(env, r, vapid, now);
+      await processOneReminder(env, r, vapid, now, options);
     } catch (err) {
       console.error('[scheduler] error for reminder', r.id, err?.message || err);
     }
   }
 }
 
-async function processOneReminder(env, r, vapid, now) {
+export async function processOneReminder(env, r, vapid, now, options = {}) {
+  const sendPush = options.sendWebPush || sendWebPush;
+  const sendTelegram = options.tgSendReminderToUser || tgSendReminderToUser;
   const attempt = (r.send_count || 0) + 1;
 
   if (attempt > MAX_ATTEMPTS) {
@@ -596,16 +597,6 @@ async function processOneReminder(env, r, vapid, now) {
     .bind(r.user_id)
     .all();
   const devices = devicesRows.results || [];
-
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
@@ -636,19 +627,21 @@ async function processOneReminder(env, r, vapid, now) {
   const newsLine = built.newsLine || null;
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)
+  let telegramSent = false;
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tgResult = await sendTelegram(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      telegramSent = Number(tgResult?.sent || 0) > 0;
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
   }
 
-  let anyOk = false;
+  let anyOk = telegramSent;
   let anyNonGoneError = false;
 
-  for (const d of devices) {
-    const result = await sendWebPush(
+  for (const d of vapid ? devices : []) {
+    const result = await sendPush(
       { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
       {
         type: 'reminder',
@@ -698,7 +691,12 @@ async function processOneReminder(env, r, vapid, now) {
     return;
   }
   if (!anyOk) {
-    // Vse device'y goneли
+    // Net rabotayushchikh kanalov — otkladyvayem, chtoby ne krutit' cron kazhduyu minutu.
+    await env.DB.prepare(
+      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+    )
+      .bind(now + 60 * 60_000, now, r.id)
+      .run();
     return;
   }
 
