@@ -19,6 +19,18 @@ function parseUserNewsCategories(raw) {
   }
 }
 
+async function getUserProfileForResponse(env, userId) {
+  try {
+    return await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
+      .bind(userId)
+      .first();
+  } catch {
+    return await env.DB.prepare(`SELECT display_name, lang FROM users WHERE id = ?1`)
+      .bind(userId)
+      .first();
+  }
+}
+
 // ============================================================================
 // Utility
 // ============================================================================
@@ -318,9 +330,7 @@ export async function handleRegisterFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
-    .bind(row.user_id)
-    .first();
+  const userRow = await getUserProfileForResponse(env, row.user_id);
 
   return {
     ok: true,
@@ -439,9 +449,7 @@ export async function handleLoginFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
-    .bind(credRow.user_id)
-    .first();
+  const userRow = await getUserProfileForResponse(env, credRow.user_id);
 
   return {
     ok: true,
