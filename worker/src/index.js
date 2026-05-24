@@ -272,6 +272,15 @@ async function handleSubscribe(request, env, user) {
     return jsonResponse({ error: 'subscription { endpoint, keys { p256dh, auth } } required' }, 400, request, env);
   }
 
+  const existingDevice = await env.DB.prepare(
+    `SELECT user_id FROM devices WHERE id = ?1`,
+  )
+    .bind(deviceId)
+    .first();
+  if (existingDevice?.user_id && existingDevice.user_id !== user.userId) {
+    return jsonResponse({ error: 'device belongs to another user' }, 403, request, env);
+  }
+
   const now = Date.now();
   await env.DB.prepare(
     `INSERT INTO devices (id, user_id, endpoint, p256dh, auth, user_agent, created_at, last_seen_at)
@@ -345,6 +354,7 @@ async function handleUpsertReminder(request, env, user) {
     fireAt,
     repeat = 'none',
     tone = 'friendly',
+    updatedAt,
   } = body || {};
 
   if (!id || !title || !fireAt) {
@@ -357,9 +367,34 @@ async function handleUpsertReminder(request, env, user) {
     return jsonResponse({ error: 'invalid tone' }, 400, request, env);
   }
 
+  const existingDevice = await env.DB.prepare(
+    `SELECT user_id FROM devices WHERE id = ?1`,
+  )
+    .bind(deviceId)
+    .first();
+  if (existingDevice?.user_id && existingDevice.user_id !== user.userId) {
+    return jsonResponse({ error: 'device belongs to another user' }, 403, request, env);
+  }
+
+  const now = Date.now();
+  if (!existingDevice) {
+    await env.DB.prepare(
+      `INSERT INTO devices (id, user_id, endpoint, p256dh, auth, user_agent, created_at, last_seen_at, revoked_at)
+       VALUES (?1, ?2, ?3, '', '', ?4, ?5, ?5, ?5)`,
+    )
+      .bind(deviceId, user.userId, 'local:' + deviceId, request.headers.get('User-Agent') || '', now)
+      .run();
+  } else if (!existingDevice.user_id) {
+    await env.DB.prepare(
+      `UPDATE devices SET user_id = ?1, last_seen_at = ?2 WHERE id = ?3 AND user_id IS NULL`,
+    )
+      .bind(user.userId, now, deviceId)
+      .run();
+  }
+
   // Yesli updateim — proverim vladel'tsa
   const existing = await env.DB.prepare(
-    `SELECT user_id FROM reminders WHERE id = ?1`,
+    `SELECT user_id, title, note, fire_at, repeat, tone, status, updated_at FROM reminders WHERE id = ?1`,
   )
     .bind(id)
     .first();
@@ -367,27 +402,43 @@ async function handleUpsertReminder(request, env, user) {
     return jsonResponse({ error: 'forbidden' }, 403, request, env);
   }
 
-  const now = Date.now();
-  await env.DB.prepare(
-    `INSERT INTO reminders
-      (id, user_id, device_id, title, note, fire_at, repeat, tone, status, send_count, next_attempt_at, created_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', 0, ?6, ?9, ?9)
-     ON CONFLICT(id) DO UPDATE SET
-       user_id = excluded.user_id,
-       title = excluded.title,
-       note = excluded.note,
-       fire_at = excluded.fire_at,
-       repeat = excluded.repeat,
-       tone = excluded.tone,
-       status = 'active',
-       send_count = 0,
-       last_sent_at = NULL,
-       next_attempt_at = excluded.fire_at,
-       acked_at = NULL,
-       updated_at = excluded.updated_at`,
-  )
-    .bind(id, user.userId, deviceId, title, note, fireAt, repeat, tone, now)
-    .run();
+  const clientUpdatedAt = Number(updatedAt) > 0 ? Number(updatedAt) : now;
+  if (existing && Number(existing.updated_at || 0) > clientUpdatedAt) {
+    return jsonResponse({ ok: true, id, stale: true }, 200, request, env);
+  }
+
+  const contentChanged =
+    !existing ||
+    existing.title !== title ||
+    (existing.note || '') !== (note || '') ||
+    Number(existing.fire_at) !== Number(fireAt) ||
+    (existing.repeat || 'none') !== repeat ||
+    (existing.tone || 'friendly') !== tone;
+
+  if (!existing) {
+    await env.DB.prepare(
+      `INSERT INTO reminders
+        (id, user_id, device_id, title, note, fire_at, repeat, tone, status, send_count, next_attempt_at, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', 0, ?6, ?9, ?10)`,
+    )
+      .bind(id, user.userId, deviceId, title, note, fireAt, repeat, tone, now, clientUpdatedAt)
+      .run();
+  } else if (contentChanged) {
+    await env.DB.prepare(
+      `UPDATE reminders
+       SET user_id = ?1, device_id = ?2, title = ?3, note = ?4, fire_at = ?5, repeat = ?6, tone = ?7,
+           status = 'active', send_count = 0, last_sent_at = NULL, next_attempt_at = ?5, acked_at = NULL, updated_at = ?8
+       WHERE id = ?9`,
+    )
+      .bind(user.userId, deviceId, title, note, fireAt, repeat, tone, clientUpdatedAt, id)
+      .run();
+  } else {
+    await env.DB.prepare(
+      `UPDATE reminders SET user_id = ?1, device_id = ?2, updated_at = MAX(updated_at, ?3) WHERE id = ?4`,
+    )
+      .bind(user.userId, deviceId, clientUpdatedAt, id)
+      .run();
+  }
 
   return jsonResponse({ ok: true, id }, 200, request, env);
 }
@@ -545,11 +596,14 @@ async function countPendingRemindersForDevice(env, deviceId) {
 const ESCALATION_DELAYS_MIN = [2, 5, 10, 20]; // posle 1-y, 2-y, 3-y, 4-y popytki
 const MAX_ATTEMPTS = 5;
 
-async function runScheduler(env) {
+export async function runScheduler(env) {
   const vapid = getVapidConfig(env);
-  if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
+  if (!vapid && !env.TELEGRAM_BOT_TOKEN) {
+    console.warn('[scheduler] no delivery channel configured, skipping');
     return;
+  }
+  if (!vapid) {
+    console.warn('[scheduler] VAPID not configured, using non-push channels only');
   }
 
   const now = Date.now();
@@ -577,7 +631,7 @@ async function runScheduler(env) {
   }
 }
 
-async function processOneReminder(env, r, vapid, now) {
+export async function processOneReminder(env, r, vapid, now) {
   const attempt = (r.send_count || 0) + 1;
 
   if (attempt > MAX_ATTEMPTS) {
@@ -596,16 +650,6 @@ async function processOneReminder(env, r, vapid, now) {
     .bind(r.user_id)
     .all();
   const devices = devicesRows.results || [];
-
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
@@ -635,10 +679,13 @@ async function processOneReminder(env, r, vapid, now) {
   });
   const newsLine = built.newsLine || null;
 
-  // Parallelno shlyom v Telegram (esli user'a privyazal)
+  let telegramDelivered = false;
+
+  // Shlyom v Telegram nezavisimo ot nalichiya Web Push device'ov.
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tgResult = await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      telegramDelivered = Number(tgResult?.sent || 0) > 0;
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
@@ -647,7 +694,7 @@ async function processOneReminder(env, r, vapid, now) {
   let anyOk = false;
   let anyNonGoneError = false;
 
-  for (const d of devices) {
+  for (const d of vapid ? devices : []) {
     const result = await sendWebPush(
       { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
       {
@@ -693,12 +740,19 @@ async function processOneReminder(env, r, vapid, now) {
     else anyNonGoneError = true;
   }
 
-  if (!anyOk && anyNonGoneError) {
+  const delivered = anyOk || telegramDelivered;
+
+  if (!delivered && anyNonGoneError) {
     // Vse popytki v etu iteratsiyu upali — ne prodvigayem schetchik
     return;
   }
-  if (!anyOk) {
-    // Vse device'y goneли
+  if (!delivered) {
+    // Net dostupnogo kanala — ne spin'im cron kazhduyu minutu.
+    await env.DB.prepare(
+      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+    )
+      .bind(now + 60 * 60_000, now, r.id)
+      .run();
     return;
   }
 
