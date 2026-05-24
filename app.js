@@ -976,8 +976,13 @@ async function syncReminderToBackend(r) {
         fireAt: r.fireAt,
         repeat: r.repeat || 'none',
         tone: r.tone || 'friendly',
+        updatedAt: r.updatedAt || r.createdAt || Date.now(),
       },
     });
+    if (r.pendingSync) {
+      r.pendingSync = false;
+      await db.put(r);
+    }
   } catch (err) {
     console.warn('sync reminder failed:', err);
   }
@@ -1041,7 +1046,7 @@ async function syncAllReminders() {
       }
       // Udalyaem lokalnye reminder'y, kotorykh bolshe net na servere (udaleno s drugogo ustr.)
       for (const l of localAll) {
-        if (!byId.has(l.id)) {
+        if (!byId.has(l.id) && !l.pendingSync) {
           await db.delete(l.id);
         }
       }
@@ -1257,6 +1262,8 @@ async function addReminder(e) {
     repeat,
     tone,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
+    pendingSync: true,
   };
 
   try {
