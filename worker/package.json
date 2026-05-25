@@ -8,6 +8,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
+    "test": "node --no-warnings --test",
     "db:init": "wrangler d1 execute push-az-db --file=./schema.sql",
     "db:init:local": "wrangler d1 execute push-az-db --local --file=./schema.sql",
     "tail": "wrangler tail"

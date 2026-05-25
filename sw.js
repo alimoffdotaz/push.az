@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v30';
+const CACHE = 'push-az-v31';
 const ASSETS = [
   '/',
   '/index.html',
@@ -301,8 +301,9 @@ self.addEventListener('notificationclick', (event) => {
 
       // === SNOOZE \u2014 edinstvennoye chto mozhno sdelat' iz samogo pusha ===
       if (action === 'snooze') {
-        if (isRealReminder) await callAck(reminderId, 'snooze', 10);
-        await notifyClients({ type: 'reminder-snoozed', reminderId });
+        const minutes = 10;
+        const ackOk = !isRealReminder || await callAck(reminderId, 'snooze', minutes);
+        if (ackOk) await notifyClients({ type: 'reminder-snoozed', reminderId, minutes });
         return;
       }
 
@@ -353,17 +354,22 @@ async function callAck(reminderId, action, minutes = 10) {
   try {
     const workerUrl = await config.get('workerUrl', '');
     const deviceId = await config.get('deviceId', '');
+    const sessionToken = await config.get('sessionToken', '');
     if (!workerUrl || !deviceId) return;
-    await fetch(workerUrl.replace(/\/+$/, '') + '/api/ack', {
+    const res = await fetch(workerUrl.replace(/\/+$/, '') + '/api/ack', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Device-Id': deviceId,
+        ...(sessionToken ? { Authorization: 'Bearer ' + sessionToken } : {}),
       },
       body: JSON.stringify({ reminderId, action, minutes }),
     });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return true;
   } catch (err) {
     console.warn('[sw] ack failed:', err);
+    return false;
   }
 }
 
