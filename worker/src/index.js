@@ -379,11 +379,26 @@ async function handleUpsertReminder(request, env, user) {
        fire_at = excluded.fire_at,
        repeat = excluded.repeat,
        tone = excluded.tone,
-       status = 'active',
-       send_count = 0,
-       last_sent_at = NULL,
-       next_attempt_at = excluded.fire_at,
-       acked_at = NULL,
+       status = CASE
+         WHEN reminders.fire_at IS NOT excluded.fire_at OR reminders.repeat IS NOT excluded.repeat THEN 'active'
+         ELSE reminders.status
+       END,
+       send_count = CASE
+         WHEN reminders.fire_at IS NOT excluded.fire_at OR reminders.repeat IS NOT excluded.repeat THEN 0
+         ELSE reminders.send_count
+       END,
+       last_sent_at = CASE
+         WHEN reminders.fire_at IS NOT excluded.fire_at OR reminders.repeat IS NOT excluded.repeat THEN NULL
+         ELSE reminders.last_sent_at
+       END,
+       next_attempt_at = CASE
+         WHEN reminders.fire_at IS NOT excluded.fire_at OR reminders.repeat IS NOT excluded.repeat THEN excluded.fire_at
+         ELSE reminders.next_attempt_at
+       END,
+       acked_at = CASE
+         WHEN reminders.fire_at IS NOT excluded.fire_at OR reminders.repeat IS NOT excluded.repeat THEN NULL
+         ELSE reminders.acked_at
+       END,
        updated_at = excluded.updated_at`,
   )
     .bind(id, user.userId, deviceId, title, note, fireAt, repeat, tone, now)
@@ -548,8 +563,7 @@ const MAX_ATTEMPTS = 5;
 async function runScheduler(env) {
   const vapid = getVapidConfig(env);
   if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
-    return;
+    console.warn('[scheduler] VAPID not configured, Web Push disabled');
   }
 
   const now = Date.now();
@@ -597,16 +611,6 @@ async function processOneReminder(env, r, vapid, now) {
     .all();
   const devices = devicesRows.results || [];
 
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
-
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
   // Yazyk i kategorii "novostey" dlya push / TG
@@ -636,9 +640,11 @@ async function processOneReminder(env, r, vapid, now) {
   const newsLine = built.newsLine || null;
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)
+  let telegramSent = false;
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tgResult = await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      telegramSent = Number(tgResult?.sent || 0) > 0;
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
@@ -647,7 +653,7 @@ async function processOneReminder(env, r, vapid, now) {
   let anyOk = false;
   let anyNonGoneError = false;
 
-  for (const d of devices) {
+  for (const d of vapid ? devices : []) {
     const result = await sendWebPush(
       { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
       {
@@ -693,12 +699,17 @@ async function processOneReminder(env, r, vapid, now) {
     else anyNonGoneError = true;
   }
 
-  if (!anyOk && anyNonGoneError) {
+  if (!anyOk && anyNonGoneError && !telegramSent) {
     // Vse popytki v etu iteratsiyu upali — ne prodvigayem schetchik
     return;
   }
-  if (!anyOk) {
-    // Vse device'y goneли
+  if (!anyOk && !telegramSent) {
+    // Net rabochikh kanalov dostavki — ne krutim cron kazhduyu minutu.
+    await env.DB.prepare(
+      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+    )
+      .bind(now + 60 * 60_000, now, r.id)
+      .run();
     return;
   }
 

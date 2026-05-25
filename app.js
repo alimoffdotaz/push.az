@@ -965,7 +965,7 @@ function updatePushStatusPill() {
 // ============================================================================
 
 async function syncReminderToBackend(r) {
-  if (!state.workerUrl) return;
+  if (!state.workerUrl || !state.sessionToken) return false;
   try {
     await api('/api/reminders', {
       method: 'POST',
@@ -978,8 +978,18 @@ async function syncReminderToBackend(r) {
         tone: r.tone || 'friendly',
       },
     });
+    r.pendingSync = false;
+    r.updatedAt = Date.now();
+    await db.put(r);
+    return true;
   } catch (err) {
     console.warn('sync reminder failed:', err);
+    try {
+      r.pendingSync = true;
+      r.updatedAt = r.updatedAt || Date.now();
+      await db.put(r);
+    } catch {}
+    return false;
   }
 }
 
@@ -1009,7 +1019,13 @@ async function syncAllReminders() {
   if (!state.sessionToken) return;
   state.syncing = true;
   try {
-    // 1) Pull from server (vse user reminder'y so vsekh device'ev)
+    // 1) Push local-only rows before authoritative pull can delete server-unknown ids.
+    const pendingBeforePull = (await db.getAll()).filter((r) => r.pendingSync || !r.updatedAt);
+    for (const r of pendingBeforePull) {
+      try { await syncReminderToBackend(r); } catch {}
+    }
+
+    // 2) Pull from server (vse user reminder'y so vsekh device'ev)
     try {
       const resp = await api('/api/reminders', { method: 'GET' });
       const serverRems = Array.isArray(resp?.reminders) ? resp.reminders : [];
@@ -1041,7 +1057,7 @@ async function syncAllReminders() {
       }
       // Udalyaem lokalnye reminder'y, kotorykh bolshe net na servere (udaleno s drugogo ustr.)
       for (const l of localAll) {
-        if (!byId.has(l.id)) {
+        if (!byId.has(l.id) && !l.pendingSync && l.updatedAt) {
           await db.delete(l.id);
         }
       }
@@ -1053,8 +1069,9 @@ async function syncAllReminders() {
       console.warn('sync pull failed', err);
     }
 
-    // 2) Push local (dlya noviklyx reminder'ev, sozdannykh offline)
-    for (const r of state.reminders) {
+    // 3) Retry rows that are still waiting for their first successful upload.
+    const stillPending = (await db.getAll()).filter((r) => r.pendingSync || !r.updatedAt);
+    for (const r of stillPending) {
       try { await syncReminderToBackend(r); } catch {}
     }
   } finally {
@@ -1257,6 +1274,8 @@ async function addReminder(e) {
     repeat,
     tone,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
+    pendingSync: true,
   };
 
   try {
@@ -1330,6 +1349,7 @@ async function snoozeReminder(id, minutes) {
   const r = state.reminders.find((x) => x.id === id);
   if (!r) return;
   r.fireAt = Date.now() + minutes * 60000;
+  r.updatedAt = Date.now();
   await db.put(r);
   state.reminders.sort((a, b) => a.fireAt - b.fireAt);
   await scheduleLocalNotification(r);
@@ -1739,8 +1759,14 @@ function setupSWMessageHandler() {
       if (!reminderId || reminderId === 'test') return;
       const r = state.reminders.find((x) => x.id === reminderId);
       if (r) {
-        r.fireAt = Date.now() + 10 * 60000;
+        const minutes = Number(msg.minutes) > 0 ? Number(msg.minutes) : 10;
+        r.fireAt = Date.now() + minutes * 60000;
+        r.updatedAt = Date.now();
+        r.status = 'active';
+        r.acked = false;
         await db.put(r);
+        state.reminders.sort((a, b) => a.fireAt - b.fireAt);
+        await scheduleLocalNotification(r);
         render();
       }
       if (state.takeoverActive && takeoverEl?.dataset.reminderId === reminderId) hideTakeover();
