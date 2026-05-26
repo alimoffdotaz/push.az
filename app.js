@@ -1737,10 +1737,13 @@ function setupSWMessageHandler() {
 
     if (msg.type === 'reminder-snoozed') {
       if (!reminderId || reminderId === 'test') return;
+      const minutes = Number(msg.minutes) > 0 ? Number(msg.minutes) : 10;
+      if (!msg.serverAcked) await syncAckToBackend(reminderId, 'snooze', minutes);
       const r = state.reminders.find((x) => x.id === reminderId);
       if (r) {
-        r.fireAt = Date.now() + 10 * 60000;
+        r.fireAt = Date.now() + minutes * 60000;
         await db.put(r);
+        await scheduleLocalNotification(r);
         render();
       }
       if (state.takeoverActive && takeoverEl?.dataset.reminderId === reminderId) hideTakeover();
