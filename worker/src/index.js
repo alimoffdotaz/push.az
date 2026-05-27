@@ -379,11 +379,26 @@ async function handleUpsertReminder(request, env, user) {
        fire_at = excluded.fire_at,
        repeat = excluded.repeat,
        tone = excluded.tone,
-       status = 'active',
-       send_count = 0,
-       last_sent_at = NULL,
-       next_attempt_at = excluded.fire_at,
-       acked_at = NULL,
+       status = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN 'active'
+         ELSE reminders.status
+       END,
+       send_count = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN 0
+         ELSE reminders.send_count
+       END,
+       last_sent_at = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN NULL
+         ELSE reminders.last_sent_at
+       END,
+       next_attempt_at = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN excluded.fire_at
+         ELSE reminders.next_attempt_at
+       END,
+       acked_at = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN NULL
+         ELSE reminders.acked_at
+       END,
        updated_at = excluded.updated_at`,
   )
     .bind(id, user.userId, deviceId, title, note, fireAt, repeat, tone, now)
@@ -548,8 +563,7 @@ const MAX_ATTEMPTS = 5;
 async function runScheduler(env) {
   const vapid = getVapidConfig(env);
   if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
-    return;
+    console.warn('[scheduler] VAPID not configured, Web Push disabled');
   }
 
   const now = Date.now();
@@ -589,24 +603,6 @@ async function processOneReminder(env, r, vapid, now) {
     return;
   }
 
-  // Nakhodim vse aktivnye device'y polzovatelya
-  const devicesRows = await env.DB.prepare(
-    `SELECT * FROM devices WHERE user_id = ?1 AND revoked_at IS NULL`,
-  )
-    .bind(r.user_id)
-    .all();
-  const devices = devicesRows.results || [];
-
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
-
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
   // Yazyk i kategorii "novostey" dlya push / TG
@@ -635,19 +631,30 @@ async function processOneReminder(env, r, vapid, now) {
   });
   const newsLine = built.newsLine || null;
 
-  // Parallelno shlyom v Telegram (esli user'a privyazal)
+  let telegramDelivered = false;
+
+  // Shlyom v Telegram nezavisimo ot sostoyaniya Web Push: u user'a mozhet byt' tol'ko TG.
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tg = await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      telegramDelivered = Number(tg?.sent || 0) > 0;
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
   }
 
-  let anyOk = false;
+  // Nakhodim vse aktivnye device'y polzovatelya
+  const devicesRows = await env.DB.prepare(
+    `SELECT * FROM devices WHERE user_id = ?1 AND revoked_at IS NULL`,
+  )
+    .bind(r.user_id)
+    .all();
+  const devices = devicesRows.results || [];
+
+  let anyOk = telegramDelivered;
   let anyNonGoneError = false;
 
-  for (const d of devices) {
+  if (vapid) for (const d of devices) {
     const result = await sendWebPush(
       { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
       {
@@ -698,10 +705,23 @@ async function processOneReminder(env, r, vapid, now) {
     return;
   }
   if (!anyOk) {
-    // Vse device'y goneли
+    // Net dostupnykh kanalov (net TG, net VAPID/device'ev ili vse device'y gone)
+    await backoffReminderNoChannel(env, r.id, now);
     return;
   }
 
+  await recordReminderDelivery(env, r, attempt, now);
+}
+
+async function backoffReminderNoChannel(env, reminderId, now) {
+  await env.DB.prepare(
+    `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+  )
+    .bind(now + 60 * 60_000, now, reminderId)
+    .run();
+}
+
+async function recordReminderDelivery(env, r, attempt, now) {
   if (attempt >= MAX_ATTEMPTS) {
     if (r.repeat && r.repeat !== 'none') {
       const nextFire = computeNextFireAt(r.fire_at, r.repeat, now);
@@ -763,3 +783,7 @@ function computeNextFireAt(prevFireAt, repeat, now) {
   } while (t <= now);
   return t;
 }
+
+export const __test = {
+  runScheduler,
+};
