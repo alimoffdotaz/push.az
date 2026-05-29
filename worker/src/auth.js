@@ -19,6 +19,19 @@ function parseUserNewsCategories(raw) {
   }
 }
 
+async function getUserProfile(env, userId) {
+  try {
+    return await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
+      .bind(userId)
+      .first();
+  } catch (err) {
+    // Existing D1 databases may briefly run new code before migration 004 is applied.
+    return env.DB.prepare(`SELECT display_name, lang FROM users WHERE id = ?1`)
+      .bind(userId)
+      .first();
+  }
+}
+
 // ============================================================================
 // Utility
 // ============================================================================
@@ -318,9 +331,7 @@ export async function handleRegisterFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
-    .bind(row.user_id)
-    .first();
+  const userRow = await getUserProfile(env, row.user_id);
 
   return {
     ok: true,
@@ -439,9 +450,7 @@ export async function handleLoginFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
-    .bind(credRow.user_id)
-    .first();
+  const userRow = await getUserProfile(env, credRow.user_id);
 
   return {
     ok: true,
@@ -497,9 +506,13 @@ export async function handleSetNewsCategories(request, env) {
   let body;
   try { body = await request.json(); } catch { body = {}; }
   const out = normalizeNewsCategoryIds(body.categories);
-  await env.DB.prepare(`UPDATE users SET news_categories = ?1 WHERE id = ?2`)
-    .bind(JSON.stringify(out), user.userId)
-    .run();
+  try {
+    await env.DB.prepare(`UPDATE users SET news_categories = ?1 WHERE id = ?2`)
+      .bind(JSON.stringify(out), user.userId)
+      .run();
+  } catch (err) {
+    return { error: 'news categories storage is not migrated', status: 503 };
+  }
 
   return { ok: true, newsCategories: out };
 }

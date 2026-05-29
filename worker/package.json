@@ -10,6 +10,7 @@
     "dev": "wrangler dev",
     "db:init": "wrangler d1 execute push-az-db --file=./schema.sql",
     "db:init:local": "wrangler d1 execute push-az-db --local --file=./schema.sql",
+    "test": "node --test",
     "tail": "wrangler tail"
   },
   "dependencies": {
