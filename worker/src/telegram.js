@@ -355,11 +355,13 @@ async function consumeLinkCode(env, code) {
 
 export async function handleTelegramWebhook(request, env) {
   const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET;
-  if (expectedSecret) {
-    const got = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (got !== expectedSecret) {
-      return new Response('forbidden', { status: 403 });
-    }
+  if (!expectedSecret) {
+    console.error('[tg] TELEGRAM_WEBHOOK_SECRET is required for webhook requests');
+    return new Response('webhook secret not configured', { status: 503 });
+  }
+  const got = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
+  if (got !== expectedSecret) {
+    return new Response('forbidden', { status: 403 });
   }
 
   let update;

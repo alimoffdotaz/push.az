@@ -346,6 +346,7 @@ async function handleUpsertReminder(request, env, user) {
     repeat = 'none',
     tone = 'friendly',
   } = body || {};
+  const clientUpdatedAt = Number(body?.updatedAt) || 0;
 
   if (!id || !title || !fireAt) {
     return jsonResponse({ error: 'id, title, fireAt required' }, 400, request, env);
@@ -359,7 +360,7 @@ async function handleUpsertReminder(request, env, user) {
 
   // Yesli updateim — proverim vladel'tsa
   const existing = await env.DB.prepare(
-    `SELECT user_id FROM reminders WHERE id = ?1`,
+    `SELECT user_id, fire_at, repeat, updated_at FROM reminders WHERE id = ?1`,
   )
     .bind(id)
     .first();
@@ -368,10 +369,14 @@ async function handleUpsertReminder(request, env, user) {
   }
 
   const now = Date.now();
+  if (existing && clientUpdatedAt && Number(existing.updated_at || 0) > clientUpdatedAt) {
+    return jsonResponse({ ok: true, id, stale: true }, 200, request, env);
+  }
+  const updatedAt = Math.max(clientUpdatedAt, now);
   await env.DB.prepare(
     `INSERT INTO reminders
       (id, user_id, device_id, title, note, fire_at, repeat, tone, status, send_count, next_attempt_at, created_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', 0, ?6, ?9, ?9)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', 0, ?6, ?9, ?10)
      ON CONFLICT(id) DO UPDATE SET
        user_id = excluded.user_id,
        title = excluded.title,
@@ -379,14 +384,29 @@ async function handleUpsertReminder(request, env, user) {
        fire_at = excluded.fire_at,
        repeat = excluded.repeat,
        tone = excluded.tone,
-       status = 'active',
-       send_count = 0,
-       last_sent_at = NULL,
-       next_attempt_at = excluded.fire_at,
-       acked_at = NULL,
+       status = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN 'active'
+         ELSE reminders.status
+       END,
+       send_count = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN 0
+         ELSE reminders.send_count
+       END,
+       last_sent_at = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN NULL
+         ELSE reminders.last_sent_at
+       END,
+       next_attempt_at = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN excluded.fire_at
+         ELSE reminders.next_attempt_at
+       END,
+       acked_at = CASE
+         WHEN reminders.fire_at != excluded.fire_at OR reminders.repeat != excluded.repeat THEN NULL
+         ELSE reminders.acked_at
+       END,
        updated_at = excluded.updated_at`,
   )
-    .bind(id, user.userId, deviceId, title, note, fireAt, repeat, tone, now)
+    .bind(id, user.userId, deviceId, title, note, fireAt, repeat, tone, now, updatedAt)
     .run();
 
   return jsonResponse({ ok: true, id }, 200, request, env);
@@ -548,8 +568,7 @@ const MAX_ATTEMPTS = 5;
 async function runScheduler(env) {
   const vapid = getVapidConfig(env);
   if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
-    return;
+    console.warn('[scheduler] VAPID not configured, continuing with non-push channels');
   }
 
   const now = Date.now();
@@ -577,7 +596,7 @@ async function runScheduler(env) {
   }
 }
 
-async function processOneReminder(env, r, vapid, now) {
+async function processOneReminder(env, r, vapid, now, deps = { buildPushBody, tgSendReminderToUser, sendWebPush }) {
   const attempt = (r.send_count || 0) + 1;
 
   if (attempt > MAX_ATTEMPTS) {
@@ -596,16 +615,6 @@ async function processOneReminder(env, r, vapid, now) {
     .bind(r.user_id)
     .all();
   const devices = devicesRows.results || [];
-
-  if (!devices.length) {
-    // Net device'ev — prosto prodvigayem next_attempt, chtoby ne lomat' schedule (ili otmenyayem)
-    await env.DB.prepare(
-      `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
-    )
-      .bind(now + 60 * 60_000, now, r.id) // retray cherez chas
-      .run();
-    return;
-  }
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
@@ -628,7 +637,7 @@ async function processOneReminder(env, r, vapid, now) {
   } catch {}
 
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
-  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount, {
+  const built = await deps.buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount, {
     newsCategories,
     // Unikal'nost' na kazhdyy konkretnyy "vykhod" schedulera (eskalyatsii, srezы povtora)
     newsSeedExtra: [r.next_attempt_at, r.send_count, r.fire_at, r.updated_at].map(String).join(':'),
@@ -636,72 +645,108 @@ async function processOneReminder(env, r, vapid, now) {
   const newsLine = built.newsLine || null;
 
   // Parallelno shlyom v Telegram (esli user'a privyazal)
+  let telegramDelivered = false;
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      const tgResult = await deps.tgSendReminderToUser(
+        env,
+        r.user_id,
+        reminder,
+        built.text,
+        attempt,
+        MAX_ATTEMPTS,
+        newsLine,
+      );
+      telegramDelivered = Number(tgResult?.sent || 0) > 0;
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
   }
 
+  if (!devices.length) {
+    if (telegramDelivered) {
+      await recordReminderDeliveryAttempt(env, r, attempt, now);
+    } else {
+      await postponeReminderRetry(env, r.id, now);
+    }
+    return;
+  }
+
   let anyOk = false;
   let anyNonGoneError = false;
 
-  for (const d of devices) {
-    const result = await sendWebPush(
-      { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
-      {
-        type: 'reminder',
-        reminderId: r.id,
-        title: r.title,
-        body: built.text,
-        newsLine: newsLine || undefined,
-        attempt,
-        maxAttempts: MAX_ATTEMPTS,
-        fireAt: r.fire_at,
-        tone: r.tone,
-        pendingCount,
-        lang,
-      },
-      vapid,
-      { ttl: 60, urgency: 'high', topic: 'r-' + r.id },
-    );
+  if (vapid) {
+    for (const d of devices) {
+      const result = await deps.sendWebPush(
+        { endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth },
+        {
+          type: 'reminder',
+          reminderId: r.id,
+          title: r.title,
+          body: built.text,
+          newsLine: newsLine || undefined,
+          attempt,
+          maxAttempts: MAX_ATTEMPTS,
+          fireAt: r.fire_at,
+          tone: r.tone,
+          pendingCount,
+          lang,
+        },
+        vapid,
+        { ttl: 60, urgency: 'high', topic: 'r-' + r.id },
+      );
 
-    await env.DB.prepare(
-      `INSERT INTO push_log (reminder_id, device_id, user_id, sent_at, attempt, body, status, error)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
-    )
-      .bind(
-        r.id,
-        d.id,
-        r.user_id,
-        now,
-        attempt,
-        built.text,
-        result.status,
-        result.ok ? null : String(result.body || '').slice(0, 500),
+      await env.DB.prepare(
+        `INSERT INTO push_log (reminder_id, device_id, user_id, sent_at, attempt, body, status, error)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
       )
-      .run();
-
-    if (result.gone) {
-      await env.DB.prepare(`UPDATE devices SET revoked_at = ?1 WHERE id = ?2`)
-        .bind(now, d.id)
+        .bind(
+          r.id,
+          d.id,
+          r.user_id,
+          now,
+          attempt,
+          built.text,
+          result.status,
+          result.ok ? null : String(result.body || '').slice(0, 500),
+        )
         .run();
-      continue;
+
+      if (result.gone) {
+        await env.DB.prepare(`UPDATE devices SET revoked_at = ?1 WHERE id = ?2`)
+          .bind(now, d.id)
+          .run();
+        continue;
+      }
+      if (result.ok) anyOk = true;
+      else anyNonGoneError = true;
     }
-    if (result.ok) anyOk = true;
-    else anyNonGoneError = true;
   }
 
-  if (!anyOk && anyNonGoneError) {
+  const delivered = telegramDelivered || anyOk;
+
+  if (!delivered && anyNonGoneError) {
     // Vse popytki v etu iteratsiyu upali — ne prodvigayem schetchik
     return;
   }
-  if (!anyOk) {
-    // Vse device'y goneли
+  if (!delivered) {
+    // Net rabochikh kanalov (VAPID otsutstvuyet ili vse device'y gone) — ne krutim cron kazhduyu minutu.
+    await postponeReminderRetry(env, r.id, now);
     return;
   }
 
+  await recordReminderDeliveryAttempt(env, r, attempt, now);
+}
+
+async function postponeReminderRetry(env, reminderId, now) {
+  await env.DB.prepare(
+    `UPDATE reminders SET next_attempt_at = ?1, updated_at = ?2 WHERE id = ?3`,
+  )
+    .bind(now + 60 * 60_000, now, reminderId)
+    .run();
+}
+
+async function recordReminderDeliveryAttempt(env, r, attempt, now) {
   if (attempt >= MAX_ATTEMPTS) {
     if (r.repeat && r.repeat !== 'none') {
       const nextFire = computeNextFireAt(r.fire_at, r.repeat, now);
@@ -763,3 +808,9 @@ function computeNextFireAt(prevFireAt, repeat, now) {
   } while (t <= now);
   return t;
 }
+
+export const __test = {
+  processOneReminder,
+  runScheduler,
+  handleUpsertReminder,
+};
