@@ -19,6 +19,19 @@ function parseUserNewsCategories(raw) {
   }
 }
 
+async function getUserProfile(env, userId) {
+  try {
+    return await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
+      .bind(userId)
+      .first();
+  } catch (err) {
+    // Older D1 deployments may receive Worker code before migration 004 is applied.
+    return env.DB.prepare(`SELECT display_name, lang, NULL AS news_categories FROM users WHERE id = ?1`)
+      .bind(userId)
+      .first();
+  }
+}
+
 // ============================================================================
 // Utility
 // ============================================================================
@@ -318,9 +331,7 @@ export async function handleRegisterFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
-    .bind(row.user_id)
-    .first();
+  const userRow = await getUserProfile(env, row.user_id);
 
   return {
     ok: true,
@@ -439,9 +450,7 @@ export async function handleLoginFinish(request, env) {
       .run();
   }
 
-  const userRow = await env.DB.prepare(`SELECT display_name, lang, news_categories FROM users WHERE id = ?1`)
-    .bind(credRow.user_id)
-    .first();
+  const userRow = await getUserProfile(env, credRow.user_id);
 
   return {
     ok: true,
