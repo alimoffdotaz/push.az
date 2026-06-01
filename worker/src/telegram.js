@@ -355,11 +355,13 @@ async function consumeLinkCode(env, code) {
 
 export async function handleTelegramWebhook(request, env) {
   const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET;
-  if (expectedSecret) {
-    const got = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (got !== expectedSecret) {
-      return new Response('forbidden', { status: 403 });
-    }
+  if (!expectedSecret) {
+    console.error('[tg] TELEGRAM_WEBHOOK_SECRET is not configured');
+    return new Response('forbidden', { status: 403 });
+  }
+  const got = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
+  if (got !== expectedSecret) {
+    return new Response('forbidden', { status: 403 });
   }
 
   let update;
@@ -522,6 +524,10 @@ async function handleCallbackQuery(env, cq) {
 
   if (action === 'snooze') {
     const minutes = Number(parts[2]) || 10;
+    if (![10, 30, 60].includes(minutes)) {
+      await tgAnswerCallback(env, cq.id, L.cb_error);
+      return;
+    }
     await snoozeReminderFromTelegram(env, link.user_id, reminderId, minutes);
     await tgAnswerCallback(env, cq.id, L.cb_snoozed(minutes));
     const origText = cq.message?.text || '';

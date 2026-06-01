@@ -306,7 +306,7 @@ export async function handleRegisterFinish(request, env) {
   // Privyazyvayem device k userу
   if (deviceId) {
     await env.DB.prepare(
-      `UPDATE devices SET user_id = ?1 WHERE id = ?2`,
+      `UPDATE devices SET user_id = ?1 WHERE id = ?2 AND (user_id IS NULL OR user_id = ?1)`,
     )
       .bind(row.user_id, deviceId)
       .run();
