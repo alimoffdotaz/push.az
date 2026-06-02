@@ -965,7 +965,7 @@ function updatePushStatusPill() {
 // ============================================================================
 
 async function syncReminderToBackend(r) {
-  if (!state.workerUrl) return;
+  if (!state.workerUrl) return false;
   try {
     await api('/api/reminders', {
       method: 'POST',
@@ -976,10 +976,18 @@ async function syncReminderToBackend(r) {
         fireAt: r.fireAt,
         repeat: r.repeat || 'none',
         tone: r.tone || 'friendly',
+        updatedAt: r.updatedAt || r.createdAt || Date.now(),
       },
     });
+    if (r.pendingSync) {
+      r.pendingSync = false;
+      r.updatedAt = Date.now();
+      await db.put(r);
+    }
+    return true;
   } catch (err) {
     console.warn('sync reminder failed:', err);
+    return false;
   }
 }
 
@@ -993,14 +1001,16 @@ async function syncDeleteReminderToBackend(id) {
 }
 
 async function syncAckToBackend(reminderId, action = 'done', minutes = 10) {
-  if (!state.workerUrl) return;
+  if (!state.workerUrl || !state.sessionToken) return true;
   try {
     await api('/api/ack', {
       method: 'POST',
       body: { reminderId, action, minutes },
     });
+    return true;
   } catch (err) {
     console.warn('sync ack failed:', err);
+    return false;
   }
 }
 
@@ -1041,7 +1051,7 @@ async function syncAllReminders() {
       }
       // Udalyaem lokalnye reminder'y, kotorykh bolshe net na servere (udaleno s drugogo ustr.)
       for (const l of localAll) {
-        if (!byId.has(l.id)) {
+        if (!byId.has(l.id) && !l.pendingSync) {
           await db.delete(l.id);
         }
       }
@@ -1055,7 +1065,9 @@ async function syncAllReminders() {
 
     // 2) Push local (dlya noviklyx reminder'ev, sozdannykh offline)
     for (const r of state.reminders) {
-      try { await syncReminderToBackend(r); } catch {}
+      if (r.pendingSync) {
+        try { await syncReminderToBackend(r); } catch {}
+      }
     }
   } finally {
     state.syncing = false;
@@ -1257,6 +1269,8 @@ async function addReminder(e) {
     repeat,
     tone,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
+    pendingSync: true,
   };
 
   try {
@@ -1328,14 +1342,21 @@ async function deleteReminder(id) {
 
 async function snoozeReminder(id, minutes) {
   const r = state.reminders.find((x) => x.id === id);
-  if (!r) return;
-  r.fireAt = Date.now() + minutes * 60000;
+  if (!r) return false;
+  const ackOk = await syncAckToBackend(id, 'snooze', minutes);
+  if (!ackOk) {
+    toast(t('err.generic', { err: 'snooze sync failed' }), 'error');
+    return false;
+  }
+  const updatedAt = Date.now();
+  r.fireAt = updatedAt + minutes * 60000;
+  r.updatedAt = updatedAt;
   await db.put(r);
   state.reminders.sort((a, b) => a.fireAt - b.fireAt);
   await scheduleLocalNotification(r);
-  syncAckToBackend(id, 'snooze', minutes);
   render();
   toast(t('toast.snoozed', { n: minutes }));
+  return true;
 }
 
 // ============================================================================
@@ -1598,7 +1619,11 @@ async function takeoverConfirmDone() {
     // Vazhno: snachala ack na backend (sinkhrоnно), chtoby server
     // perevyol status v 'acked' i ne otdaval reminder v syncAllReminders
     // obratno s overdue fire_at \u2014 inache takeover pokazhetsya snova.
-    try { await syncAckToBackend(id, 'done'); } catch {}
+    const ackOk = await syncAckToBackend(id, 'done');
+    if (!ackOk) {
+      toast(t('err.generic', { err: 'ack sync failed' }), 'error');
+      return;
+    }
     await db.delete(id);
     state.reminders = state.reminders.filter((x) => x.id !== id);
     await cancelLocalNotification(id);
@@ -1611,8 +1636,8 @@ async function takeoverConfirmDone() {
 async function takeoverSnoozeAction() {
   const id = takeoverEl.dataset.reminderId;
   if (!id) return hideTakeover();
-  await snoozeReminder(id, 10);
-  hideTakeover();
+  const ok = await snoozeReminder(id, 10);
+  if (ok) hideTakeover();
 }
 
 // ============================================================================
@@ -1739,11 +1764,19 @@ function setupSWMessageHandler() {
       if (!reminderId || reminderId === 'test') return;
       const r = state.reminders.find((x) => x.id === reminderId);
       if (r) {
-        r.fireAt = Date.now() + 10 * 60000;
+        const updatedAt = Date.now();
+        r.fireAt = updatedAt + 10 * 60000;
+        r.updatedAt = updatedAt;
         await db.put(r);
         render();
       }
       if (state.takeoverActive && takeoverEl?.dataset.reminderId === reminderId) hideTakeover();
+      return;
+    }
+
+    if (msg.type === 'reminder-snooze-failed') {
+      if (!reminderId || reminderId === 'test') return;
+      toast(t('err.generic', { err: 'snooze sync failed' }), 'error');
       return;
     }
 
