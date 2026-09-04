@@ -4,8 +4,10 @@
 
 import { sendWebPush } from './push.js';
 
-/** Pyat obyazatelnykh namazov (polnoch — spravochno v API, v UI ne vklyuchaem). */
-export const NAMAZ_PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+/** Pyat namazov + polnoch po dzhafari (seredina zakata–fadjra). */
+export const NAMAZ_PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'midnight'];
+
+export const NAMAZ_LEAD_MINUTES = [0, 5, 10, 15, 20, 30, 45, 60];
 
 const API_TIMING_KEYS = {
   fajr: 'Fajr',
@@ -64,10 +66,27 @@ export function normalizeNamazPrayers(input) {
   const out = [];
   for (const x of input) {
     const id = String(x || '').toLowerCase();
-    if (id === 'midnight') continue;
     if (NAMAZ_PRAYER_IDS.includes(id) && !out.includes(id)) out.push(id);
   }
   return out;
+}
+
+function normalizeLeadMin(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 10;
+  const allowed = NAMAZ_LEAD_MINUTES;
+  if (allowed.includes(n)) return n;
+  const clamped = Math.max(0, Math.min(60, Math.round(n)));
+  let best = allowed[0];
+  let dist = Math.abs(clamped - best);
+  for (const a of allowed) {
+    const d = Math.abs(clamped - a);
+    if (d < dist) {
+      best = a;
+      dist = d;
+    }
+  }
+  return best;
 }
 
 export function parseNamazSettings(row) {
@@ -79,6 +98,7 @@ export function parseNamazSettings(row) {
       city: '',
       timezone: '',
       prayers: [...NAMAZ_PRAYER_IDS],
+      leadMin: 10,
     };
   }
   let prayers = [...NAMAZ_PRAYER_IDS];
@@ -95,6 +115,7 @@ export function parseNamazSettings(row) {
     city: row.namaz_city || '',
     timezone: row.namaz_timezone || '',
     prayers,
+    leadMin: normalizeLeadMin(row.namaz_lead_min),
   };
 }
 
@@ -263,7 +284,7 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
   let rows;
   try {
     rows = await env.DB.prepare(
-      `SELECT id, lang, namaz_lat, namaz_lng, namaz_timezone, namaz_prayers
+      `SELECT id, lang, namaz_lat, namaz_lng, namaz_timezone, namaz_prayers, namaz_lead_min
        FROM users
        WHERE namaz_enabled = 1
          AND namaz_lat IS NOT NULL
@@ -295,14 +316,17 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
       );
       const zoned = getZonedParts(nowMs, day.timezone || u.namaz_timezone || 'UTC');
       const lang = u.lang || 'ru';
+      const leadMin = normalizeLeadMin(u.namaz_lead_min);
 
       for (const prayerId of prayers) {
         const hm = day.timings[prayerId];
         if (!hm) continue;
         const pMin = hmToMinutes(hm);
         if (pMin == null) continue;
-        const delta = zoned.minutes - pMin;
-        if (delta < 0 || delta >= WINDOW_MIN) continue;
+        const target = ((pMin - leadMin) % 1440 + 1440) % 1440;
+        let delta = zoned.minutes - target;
+        if (delta < 0) delta += 1440;
+        if (delta >= WINDOW_MIN) continue;
         if (await alreadySent(env, u.id, day.dateKey, prayerId)) continue;
 
         const copy = buildNamazCopy(lang, prayerId, day.timings);
@@ -345,7 +369,7 @@ async function reverseGeocodeCity(lat, lng, lang) {
 
 export async function handleGetNamaz(request, env, user) {
   const row = await env.DB.prepare(
-    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers
+    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min
      FROM users WHERE id = ?1`,
   )
     .bind(user.userId)
@@ -386,6 +410,7 @@ export async function handleSetNamaz(request, env, user) {
   }
   let prayers = normalizeNamazPrayers(body.prayers);
   if (!prayers.length) prayers = [...NAMAZ_PRAYER_IDS];
+  const leadMin = normalizeLeadMin(body.leadMin ?? body.lead_min);
 
   let city = typeof body.city === 'string' ? body.city.slice(0, 120) : '';
   let timezone = typeof body.timezone === 'string' ? body.timezone.slice(0, 80) : '';
@@ -415,8 +440,9 @@ export async function handleSetNamaz(request, env, user) {
        namaz_lng = ?3,
        namaz_city = ?4,
        namaz_timezone = ?5,
-       namaz_prayers = ?6
-     WHERE id = ?7`,
+       namaz_prayers = ?6,
+       namaz_lead_min = ?7
+     WHERE id = ?8`,
   )
     .bind(
       enabled ? 1 : 0,
@@ -425,12 +451,13 @@ export async function handleSetNamaz(request, env, user) {
       city || null,
       timezone || null,
       JSON.stringify(prayers),
+      leadMin,
       user.userId,
     )
     .run();
 
   const row = await env.DB.prepare(
-    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers
+    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min
      FROM users WHERE id = ?1`,
   )
     .bind(user.userId)

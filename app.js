@@ -91,7 +91,8 @@ const NEWS_CATEGORY_IDS = [
   'world',
 ];
 
-const NAMAZ_PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+const NAMAZ_PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'midnight'];
+const NAMAZ_LEAD_MINUTES = [0, 5, 10, 15, 20, 30, 45, 60];
 
 // ============================================================================
 // Utilities
@@ -662,6 +663,7 @@ function namazFromUser() {
     city: n?.city || '',
     timezone: n?.timezone || '',
     prayers,
+    leadMin: Number.isFinite(Number(n?.leadMin)) ? Number(n.leadMin) : 10,
   };
 }
 
@@ -704,6 +706,24 @@ function renderNamazPrayers() {
   }
 }
 
+function fillNamazLeadSelect() {
+  const sel = document.getElementById('namaz-lead');
+  if (!sel) return;
+  const current = String(namazFromUser().leadMin ?? 10);
+  if (!sel.options.length) {
+    for (const n of NAMAZ_LEAD_MINUTES) {
+      const o = document.createElement('option');
+      o.value = String(n);
+      sel.appendChild(o);
+    }
+  }
+  for (const o of sel.options) {
+    const n = Number(o.value);
+    o.textContent = n === 0 ? t('namaz.lead_at') : t('namaz.lead_n', { n });
+  }
+  sel.value = NAMAZ_LEAD_MINUTES.includes(Number(current)) ? current : '10';
+}
+
 function fillNamazSettings() {
   const box = document.getElementById('settings-namaz');
   if (!box) return;
@@ -712,6 +732,7 @@ function fillNamazSettings() {
   const n = namazFromUser();
   const en = document.getElementById('namaz-enabled');
   if (en) en.checked = n.enabled;
+  fillNamazLeadSelect();
   renderNamazPrayers();
   updateNamazLocLabel();
 }
@@ -765,6 +786,7 @@ async function locateNamaz() {
               lng,
               timezone,
               prayers: prayers.length ? prayers : prev.prayers,
+              leadMin: Number(document.getElementById('namaz-lead')?.value ?? prev.leadMin),
             },
           });
           state.user = { ...state.user, namaz: r.namaz };
@@ -1806,6 +1828,7 @@ async function saveSettings(e) {
         (i) => i.value,
       );
       const prev = namazFromUser();
+      const leadMin = Number(document.getElementById('namaz-lead')?.value);
       if (enabled && (prev.lat == null || prev.lng == null)) {
         toast(t('namaz.need_geo'), 'error');
         closeSettings();
@@ -1821,6 +1844,7 @@ async function saveSettings(e) {
             city: prev.city,
             timezone: prev.timezone,
             prayers,
+            leadMin,
           },
         });
         state.user = { ...state.user, namaz: r.namaz };

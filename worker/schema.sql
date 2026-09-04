@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
   namaz_lng         REAL,
   namaz_city        TEXT,
   namaz_timezone    TEXT,
-  namaz_prayers     TEXT    NOT NULL DEFAULT '["fajr","dhuhr","asr","maghrib","isha"]'
+  namaz_prayers     TEXT    NOT NULL DEFAULT '["fajr","dhuhr","asr","maghrib","isha","midnight"]',
+  namaz_lead_min    INTEGER NOT NULL DEFAULT 10     -- za skolko minut do namaza slat' push
 );
 
 -- WebAuthn credentials (passkeys)
