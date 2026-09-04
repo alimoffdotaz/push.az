@@ -311,6 +311,31 @@ export async function tgSendReminderToUser(env, userId, reminder, bodyText, atte
   return { sent, failed };
 }
 
+export async function tgSendNamazToUser(env, userId, title, body, lang = 'ru') {
+  const chats = await env.DB.prepare(
+    `SELECT chat_id FROM telegram_links WHERE user_id = ?1`,
+  )
+    .bind(userId)
+    .all();
+  const list = chats.results || [];
+  if (!list.length) return { sent: 0, failed: 0 };
+
+  const text = `🕌 *${escMd(title)}*\n\n${escMd(body)}`;
+  let sent = 0;
+  let failed = 0;
+  for (const row of list) {
+    try {
+      const res = await tgSendMessage(env, row.chat_id, text);
+      if (res.ok) sent++;
+      else failed++;
+    } catch (err) {
+      console.warn('[tg] namaz send', err?.message || err);
+      failed++;
+    }
+  }
+  return { sent, failed };
+}
+
 // ============================================================================
 // Link-flow: generate code, consume code
 // ============================================================================

@@ -91,6 +91,8 @@ const NEWS_CATEGORY_IDS = [
   'world',
 ];
 
+const NAMAZ_PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
 // ============================================================================
 // Utilities
 // ============================================================================
@@ -648,6 +650,141 @@ function renderNewsCategories() {
     label.appendChild(span);
     wrap.appendChild(label);
   }
+}
+
+function namazFromUser() {
+  const n = state.user && state.user.namaz;
+  const prayers = Array.isArray(n?.prayers) && n.prayers.length ? n.prayers : [...NAMAZ_PRAYER_IDS];
+  return {
+    enabled: !!n?.enabled,
+    lat: n?.lat ?? null,
+    lng: n?.lng ?? null,
+    city: n?.city || '',
+    timezone: n?.timezone || '',
+    prayers,
+  };
+}
+
+function updateNamazLocLabel() {
+  const el = document.getElementById('namaz-loc-label');
+  if (!el) return;
+  const n = namazFromUser();
+  if (n.lat == null || n.lng == null) {
+    el.textContent = t('namaz.loc_none');
+    return;
+  }
+  const city = n.city || '—';
+  el.textContent = t('namaz.loc', {
+    city,
+    lat: Number(n.lat).toFixed(4),
+    lng: Number(n.lng).toFixed(4),
+  });
+}
+
+function renderNamazPrayers() {
+  const wrap = document.getElementById('namaz-prayers');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!state.user) return;
+  const selected = new Set(namazFromUser().prayers);
+  for (const id of NAMAZ_PRAYER_IDS) {
+    const label = document.createElement('label');
+    label.className = 'news-cat';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'namaz-prayer';
+    input.value = id;
+    input.checked = selected.has(id);
+    const span = document.createElement('span');
+    span.setAttribute('data-i18n', 'namaz.prayer.' + id);
+    span.textContent = t('namaz.prayer.' + id);
+    label.appendChild(input);
+    label.appendChild(span);
+    wrap.appendChild(label);
+  }
+}
+
+function fillNamazSettings() {
+  const box = document.getElementById('settings-namaz');
+  if (!box) return;
+  box.hidden = !state.user;
+  if (!state.user) return;
+  const n = namazFromUser();
+  const en = document.getElementById('namaz-enabled');
+  if (en) en.checked = n.enabled;
+  renderNamazPrayers();
+  updateNamazLocLabel();
+}
+
+async function refreshNamazToday() {
+  const el = document.getElementById('namaz-today');
+  if (!el || !state.user) return;
+  el.hidden = true;
+  try {
+    const r = await api('/api/user/namaz', { method: 'GET' });
+    if (r?.namaz) {
+      state.user = { ...state.user, namaz: r.namaz };
+      await config.set('user', state.user);
+      updateNamazLocLabel();
+    }
+    const tms = r?.today?.timings;
+    if (!tms) return;
+    const parts = NAMAZ_PRAYER_IDS.filter((id) => tms[id]).map(
+      (id) => t('namaz.prayer.' + id) + ' ' + tms[id],
+    );
+    if (parts.length) {
+      el.textContent = t('namaz.today', { times: parts.join(' · ') });
+      el.hidden = false;
+    }
+  } catch {}
+}
+
+async function locateNamaz() {
+  if (!navigator.geolocation) {
+    toast(t('namaz.geo_fail'), 'error');
+    return;
+  }
+  await new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        const prev = namazFromUser();
+        const prayers = Array.from(document.querySelectorAll('input[name="namaz-prayer"]:checked')).map(
+          (i) => i.value,
+        );
+        const enEl = document.getElementById('namaz-enabled');
+        if (enEl) enEl.checked = true;
+        try {
+          const r = await api('/api/user/namaz', {
+            method: 'POST',
+            body: {
+              enabled: true,
+              lat,
+              lng,
+              timezone,
+              prayers: prayers.length ? prayers : prev.prayers,
+            },
+          });
+          state.user = { ...state.user, namaz: r.namaz };
+          await config.set('user', state.user);
+          fillNamazSettings();
+          await refreshNamazToday();
+          toast(t('toast.settings_saved'), 'success');
+        } catch (err) {
+          toast(t('err.generic', { err: err?.message || err }), 'error');
+        }
+        resolve();
+      },
+      (err) => {
+        const denied = err && (err.code === 1 || /denied/i.test(String(err.message || '')));
+        toast(denied ? t('namaz.geo_denied') : t('namaz.geo_fail'), 'error');
+        resolve();
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 },
+    );
+  });
 }
 
 // ============================================================================
@@ -1628,6 +1765,8 @@ async function openSettings() {
   if (newsBox) newsBox.hidden = !state.user;
   renderAccountSection();
   renderNewsCategories();
+  fillNamazSettings();
+  refreshNamazToday();
   renderTelegramSection();
   if (settingsDialog.showModal) settingsDialog.showModal();
   else settingsDialog.hidden = false;
@@ -1653,6 +1792,38 @@ async function saveSettings(e) {
       try {
         const r = await api('/api/user/news-categories', { method: 'POST', body: { categories: selected } });
         state.user = { ...state.user, newsCategories: r.newsCategories || [] };
+        await config.set('user', state.user);
+      } catch (err) {
+        toast(t('err.generic', { err: err?.message || err }), 'error');
+        closeSettings();
+        return;
+      }
+    }
+    const namazBox = document.getElementById('settings-namaz');
+    if (namazBox) {
+      const enabled = !!document.getElementById('namaz-enabled')?.checked;
+      const prayers = Array.from(document.querySelectorAll('input[name="namaz-prayer"]:checked')).map(
+        (i) => i.value,
+      );
+      const prev = namazFromUser();
+      if (enabled && (prev.lat == null || prev.lng == null)) {
+        toast(t('namaz.need_geo'), 'error');
+        closeSettings();
+        return;
+      }
+      try {
+        const r = await api('/api/user/namaz', {
+          method: 'POST',
+          body: {
+            enabled,
+            lat: prev.lat,
+            lng: prev.lng,
+            city: prev.city,
+            timezone: prev.timezone,
+            prayers,
+          },
+        });
+        state.user = { ...state.user, namaz: r.namaz };
         await config.set('user', state.user);
       } catch (err) {
         toast(t('err.generic', { err: err?.message || err }), 'error');
@@ -1989,6 +2160,9 @@ function bindEvents() {
   if (takeoverSnooze) takeoverSnooze.addEventListener('click', takeoverSnoozeAction);
 
   setupTelegramButtons();
+
+  const namazGeoBtn = document.getElementById('namaz-geo-btn');
+  if (namazGeoBtn) namazGeoBtn.addEventListener('click', locateNamaz);
 
   const addPasskeyBtn = document.getElementById('add-passkey-btn');
   const logoutBtn = document.getElementById('logout-btn');

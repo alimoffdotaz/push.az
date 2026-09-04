@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v30';
+const CACHE = 'push-az-v31';
 const ASSETS = [
   '/',
   '/index.html',
@@ -184,6 +184,25 @@ self.addEventListener('push', (event) => {
   const L = swDict(data.lang);
   if (!data.body && !('title' in data)) data.body = L.default_notif_body;
 
+  if (data.type === 'namaz') {
+    const title = data.title || 'push.az';
+    const { icon, badge, image } = pickNotificationVisuals('namaz-' + (data.prayer || 'x'), 1, false, true);
+    event.waitUntil(
+      self.registration.showNotification(title, {
+        body: data.body || L.default_body,
+        icon,
+        badge,
+        image,
+        tag: 'push-az-namaz-' + (data.prayer || 'x'),
+        renotify: true,
+        requireInteraction: false,
+        data: { ...data, url: data.url || '/', receivedAt: Date.now() },
+        silent: false,
+      }),
+    );
+    return;
+  }
+
   const reminderId = data.reminderId || '';
   const isReminder = data.type === 'reminder' && reminderId && reminderId !== 'test';
   const attempt = data.attempt || 1;
@@ -298,6 +317,11 @@ self.addEventListener('notificationclick', (event) => {
       const isRealReminder = reminderId && reminderId !== 'test' && !data.local;
 
       notification.close();
+
+      if (data.type === 'namaz') {
+        await focusClient();
+        return;
+      }
 
       // === SNOOZE \u2014 edinstvennoye chto mozhno sdelat' iz samogo pusha ===
       if (action === 'snooze') {

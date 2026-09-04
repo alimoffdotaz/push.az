@@ -888,6 +888,14 @@ html[data-theme="light"] .composer-dialog {
   flex-shrink: 0;
 }
 
+.namaz-enable {
+  margin-bottom: 10px;
+}
+
+.namaz-geo-row {
+  margin: 8px 0 6px;
+}
+
 .settings-header {
   display: flex;
   align-items: center;

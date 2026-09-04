@@ -8,6 +8,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { normalizeNewsCategoryIds } from './news.js';
+import { parseNamazSettings } from './namaz.js';
 
 function parseUserNewsCategories(raw) {
   if (raw == null || raw === '') return [];
@@ -471,17 +472,29 @@ export async function handleMe(request, env) {
     .all();
 
   let newsCategories = [];
+  let namaz = parseNamazSettings(null);
   try {
-    const rowN = await env.DB.prepare(`SELECT news_categories FROM users WHERE id = ?1`)
+    const rowN = await env.DB.prepare(
+      `SELECT news_categories, namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers
+       FROM users WHERE id = ?1`,
+    )
       .bind(user.userId)
       .first();
     newsCategories = parseUserNewsCategories(rowN?.news_categories);
+    namaz = parseNamazSettings(rowN);
   } catch {
-    newsCategories = [];
+    try {
+      const rowN = await env.DB.prepare(`SELECT news_categories FROM users WHERE id = ?1`)
+        .bind(user.userId)
+        .first();
+      newsCategories = parseUserNewsCategories(rowN?.news_categories);
+    } catch {
+      newsCategories = [];
+    }
   }
 
   return {
-    user: { id: user.userId, displayName: user.displayName, lang: user.lang, newsCategories },
+    user: { id: user.userId, displayName: user.displayName, lang: user.lang, newsCategories, namaz },
     credentials: creds.results || [],
   };
 }

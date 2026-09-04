@@ -7,7 +7,13 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    INTEGER NOT NULL,
   last_login_at INTEGER NOT NULL,
   lang              TEXT    NOT NULL DEFAULT 'ru',   -- predpochtitel'nyy yazyk: ru | az | en
-  news_categories  TEXT    NOT NULL DEFAULT '[]'    -- JSON: massiv kategorij (tech, science, …)
+  news_categories  TEXT    NOT NULL DEFAULT '[]',   -- JSON: massiv kategorij (tech, science, …)
+  namaz_enabled     INTEGER NOT NULL DEFAULT 0,     -- pushi vremeni namaza (shiitskoe / jafari)
+  namaz_lat         REAL,
+  namaz_lng         REAL,
+  namaz_city        TEXT,
+  namaz_timezone    TEXT,
+  namaz_prayers     TEXT    NOT NULL DEFAULT '["fajr","dhuhr","asr","maghrib","isha"]'
 );
 
 -- WebAuthn credentials (passkeys)
@@ -127,3 +133,20 @@ CREATE TABLE IF NOT EXISTS push_log (
   error        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_push_log_reminder ON push_log(reminder_id, sent_at);
+
+CREATE TABLE IF NOT EXISTS namaz_day_cache (
+  user_id      TEXT    NOT NULL,
+  date_key     TEXT    NOT NULL,
+  timings_json TEXT    NOT NULL,
+  timezone     TEXT,
+  fetched_at   INTEGER NOT NULL,
+  PRIMARY KEY (user_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS namaz_sent (
+  user_id  TEXT    NOT NULL,
+  date_key TEXT    NOT NULL,
+  prayer   TEXT    NOT NULL,
+  sent_at  INTEGER NOT NULL,
+  PRIMARY KEY (user_id, date_key, prayer)
+);

@@ -18,9 +18,15 @@ import {
   handleTelegramWebhook,
   createLinkCode,
   tgSendReminderToUser,
+  tgSendNamazToUser,
   setTelegramWebhook,
   getTelegramWebhookInfo,
 } from './telegram.js';
+import {
+  handleGetNamaz,
+  handleSetNamaz,
+  runNamazScheduler,
+} from './namaz.js';
 
 // ============================================================================
 // Glavnyy Worker entry point
@@ -210,6 +216,18 @@ async function handleRequest(request, env, ctx) {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
     return handleTelegramUnlink(request, env, user, tgUnlinkMatch[1]);
   }
+  if (path === '/api/user/namaz' && method === 'GET') {
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    const result = await handleGetNamaz(request, env, user);
+    if (result?.error) return jsonResponse({ error: result.error }, result.status || 400, request, env);
+    return jsonResponse(result, 200, request, env);
+  }
+  if (path === '/api/user/namaz' && method === 'POST') {
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
+    const result = await handleSetNamaz(request, env, user);
+    if (result?.error) return jsonResponse({ error: result.error }, result.status || 400, request, env);
+    return jsonResponse(result, 200, request, env);
+  }
 
   if (path === '/' || path === '/api') {
     return jsonResponse({
@@ -229,6 +247,8 @@ async function handleRequest(request, env, ctx) {
         'DELETE /api/auth/passkey/:id',
         'POST   /api/user/lang',
         'POST   /api/user/news-categories',
+        'GET    /api/user/namaz',
+        'POST   /api/user/namaz',
         'POST   /api/subscribe',
         'POST   /api/unsubscribe',
         'GET    /api/reminders',
@@ -547,33 +567,38 @@ const MAX_ATTEMPTS = 5;
 
 async function runScheduler(env) {
   const vapid = getVapidConfig(env);
-  if (!vapid) {
-    console.warn('[scheduler] VAPID not configured, skipping');
-    return;
-  }
 
-  const now = Date.now();
-  const dueRows = await env.DB.prepare(
-    `SELECT * FROM reminders
+  if (vapid) {
+    const now = Date.now();
+    const dueRows = await env.DB.prepare(
+      `SELECT * FROM reminders
      WHERE status = 'active'
        AND next_attempt_at <= ?1
        AND user_id IS NOT NULL
      LIMIT 200`,
-  )
-    .bind(now)
-    .all();
+    )
+      .bind(now)
+      .all();
 
-  const due = dueRows.results || [];
-  if (!due.length) return;
-
-  console.log(`[scheduler] processing ${due.length} due reminders`);
-
-  for (const r of due) {
-    try {
-      await processOneReminder(env, r, vapid, now);
-    } catch (err) {
-      console.error('[scheduler] error for reminder', r.id, err?.message || err);
+    const due = dueRows.results || [];
+    if (due.length) {
+      console.log(`[scheduler] processing ${due.length} due reminders`);
+      for (const r of due) {
+        try {
+          await processOneReminder(env, r, vapid, now);
+        } catch (err) {
+          console.error('[scheduler] error for reminder', r.id, err?.message || err);
+        }
+      }
     }
+  } else {
+    console.warn('[scheduler] VAPID not configured, skipping reminder pushes');
+  }
+
+  try {
+    await runNamazScheduler(env, vapid, tgSendNamazToUser);
+  } catch (err) {
+    console.error('[scheduler] namaz', err?.message || err);
   }
 }
 
