@@ -2187,18 +2187,6 @@ function bindEvents() {
 
   const namazGeoBtn = document.getElementById('namaz-geo-btn');
   if (namazGeoBtn) namazGeoBtn.addEventListener('click', locateNamaz);
-  const namazTestBtn = document.getElementById('namaz-test-btn');
-  if (namazTestBtn) {
-    namazTestBtn.addEventListener('click', async () => {
-      try {
-        const r = await api('/api/user/namaz/test', { method: 'POST', body: {} });
-        const prayer = t('namaz.prayer.' + (r.prayer || 'fajr'));
-        toast(t('namaz.test_ok', { prayer, hm: r.hm || '', web: r.web ?? 0, tg: r.telegram ?? 0 }), 'success');
-      } catch (err) {
-        toast(t('err.generic', { err: err?.message || err }), 'error');
-      }
-    });
-  }
 
   const addPasskeyBtn = document.getElementById('add-passkey-btn');
   const logoutBtn = document.getElementById('logout-btn');

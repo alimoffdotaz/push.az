@@ -159,8 +159,6 @@ const DICT = {
     'namaz.need_geo': 'Сначала определи геопозицию',
     'namaz.geo_fail': 'Не удалось получить координаты',
     'namaz.geo_denied': 'Нет доступа к геолокации — разреши в настройках браузера',
-    'namaz.test': 'Проверить пуш сейчас',
-    'namaz.test_ok': 'Отправлено: {prayer} {hm}. Веб: {web}, Telegram: {tg}',
 
     // Telegram
     'tg.title': 'Telegram',
@@ -393,8 +391,6 @@ const DICT = {
     'namaz.need_geo': 'Əvvəl mövqeyi təyin et',
     'namaz.geo_fail': 'Koordinat alınmadı',
     'namaz.geo_denied': 'Geolokasiyaya icazə yoxdur — brauzer parametrlərində aç',
-    'namaz.test': 'İndi push yoxla',
-    'namaz.test_ok': 'Göndərildi: {prayer} {hm}. Web: {web}, Telegram: {tg}',
 
     'tg.title': 'Telegram',
     'tg.chip': 'dublyaj',
@@ -617,8 +613,6 @@ const DICT = {
     'namaz.need_geo': 'Set your location first',
     'namaz.geo_fail': 'Could not get coordinates',
     'namaz.geo_denied': 'Location permission denied — enable it in the browser',
-    'namaz.test': 'Send a test push now',
-    'namaz.test_ok': 'Sent: {prayer} {hm}. Web: {web}, Telegram: {tg}',
 
     'tg.title': 'Telegram',
     'tg.chip': 'mirror',

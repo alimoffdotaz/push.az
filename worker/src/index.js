@@ -25,7 +25,6 @@ import {
 import {
   handleGetNamaz,
   handleSetNamaz,
-  handleTestNamaz,
   runNamazScheduler,
 } from './namaz.js';
 
@@ -226,12 +225,6 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/user/namaz' && method === 'POST') {
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
     const result = await handleSetNamaz(request, env, user);
-    if (result?.error) return jsonResponse({ error: result.error }, result.status || 400, request, env);
-    return jsonResponse(result, 200, request, env);
-  }
-  if (path === '/api/user/namaz/test' && method === 'POST') {
-    if (!user) return jsonResponse({ error: 'unauthorized' }, 401, request, env);
-    const result = await handleTestNamaz(request, env, user, getVapidConfig(env));
     if (result?.error) return jsonResponse({ error: result.error }, result.status || 400, request, env);
     return jsonResponse(result, 200, request, env);
   }
