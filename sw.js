@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v32';
+const CACHE = 'push-az-v33';
 const ASSETS = [
   '/',
   '/index.html',
@@ -237,6 +237,8 @@ self.addEventListener('push', (event) => {
   else if (urgent) title = baseTitle + ' \u203c';
   else title = baseTitle;
   if (te) title = te + title;
+  // iOS pochti vsegda pokazyvaet ikonku PWA; razlichaem po pervomu emoji v zagolovke.
+  if (isReminder && !String(title).startsWith('📌')) title = '📌 ' + title;
 
   const rKey = String(reminderId || (data.tag != null && data.tag !== '' ? `tag-${data.tag}` : 'push'));
   const { icon, badge, image } = pickNotificationVisuals(rKey, attempt, isFinal, urgent, data.tone);

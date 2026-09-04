@@ -9,6 +9,15 @@ export const NAMAZ_PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'mid
 
 export const NAMAZ_LEAD_MINUTES = [0, 5, 10, 15, 20, 30, 45, 60];
 
+const PRAYER_EMOJI = {
+  fajr: '🌅',
+  dhuhr: '☀️',
+  asr: '🌤️',
+  maghrib: '🌇',
+  isha: '🌙',
+  midnight: '🌑',
+};
+
 const API_TIMING_KEYS = {
   fajr: 'Fajr',
   dhuhr: 'Dhuhr',
@@ -215,14 +224,20 @@ export async function getTodayNamazForUser(env, userId, lat, lng, timezoneHint, 
   return { dateKey: zoned.dateKey, timings: fetched.timings, timezone: tz, cached: false };
 }
 
+function namazTitlePrefix(prayerId) {
+  const e = PRAYER_EMOJI[prayerId] || '🕌';
+  return `🕌${e} `;
+}
+
 function buildNamazCopy(lang, prayerId, timings) {
   const L = PRAYER_LABEL[pickLang(lang)] || PRAYER_LABEL.ru;
   const hm = timings[prayerId] || '';
   const name = L[prayerId] || prayerId;
+  const prefix = namazTitlePrefix(prayerId);
   if (prayerId === 'midnight') {
-    return { title: L.title(name, hm), body: L.body_midnight(hm) };
+    return { title: prefix + L.title(name, hm), body: L.body_midnight(hm) };
   }
-  return { title: L.title(name, hm), body: L.body(name, hm) };
+  return { title: prefix + L.title(name, hm), body: L.body(name, hm) };
 }
 
 async function alreadySent(env, userId, dateKey, prayer) {
