@@ -3,6 +3,7 @@
 // midnightMode=1: Jafari midnight = midpoint Sunset → Fajr
 
 import { sendWebPush } from './push.js';
+import { tgSendNamazToUser } from './telegram.js';
 
 /** Pyat namazov + polnoch po dzhafari (seredina zakata–fadjra). */
 export const NAMAZ_PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'midnight'];
@@ -463,4 +464,61 @@ export async function handleSetNamaz(request, env, user) {
     .bind(user.userId)
     .first();
   return { ok: true, namaz: parseNamazSettings(row) };
+}
+
+export async function handleTestNamaz(request, env, user, vapid) {
+  const row = await env.DB.prepare(
+    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min
+     FROM users WHERE id = ?1`,
+  )
+    .bind(user.userId)
+    .first();
+  const settings = parseNamazSettings(row);
+  if (settings.lat == null || settings.lng == null) {
+    return { error: 'location required', status: 400 };
+  }
+  const nowMs = Date.now();
+  const day = await getTodayNamazForUser(
+    env,
+    user.userId,
+    settings.lat,
+    settings.lng,
+    settings.timezone,
+    nowMs,
+  );
+  const zoned = getZonedParts(nowMs, day.timezone || settings.timezone || 'UTC');
+  const prayers = settings.prayers.length ? settings.prayers : [...NAMAZ_PRAYER_IDS];
+  let prayerId = prayers[0];
+  let bestWait = 99999;
+  for (const id of prayers) {
+    const pMin = hmToMinutes(day.timings[id]);
+    if (pMin == null) continue;
+    const target = ((pMin - settings.leadMin) % 1440 + 1440) % 1440;
+    let wait = target - zoned.minutes;
+    if (wait < 0) wait += 1440;
+    if (wait < bestWait) {
+      bestWait = wait;
+      prayerId = id;
+    }
+  }
+  if (!day.timings[prayerId]) {
+    return { error: 'no timings', status: 400 };
+  }
+  const copy = buildNamazCopy(user.lang || 'ru', prayerId, day.timings);
+  copy.title = 'TEST · ' + copy.title;
+  const webRes = await sendNamazPush(env, vapid, user.userId, user.lang || 'ru', prayerId, copy);
+  let telegram = 0;
+  try {
+    const tg = await tgSendNamazToUser(env, user.userId, copy.title, copy.body, user.lang || 'ru');
+    telegram = tg.sent || 0;
+  } catch (err) {
+    console.warn('[namaz] test tg', err?.message || err);
+  }
+  return {
+    ok: true,
+    prayer: prayerId,
+    hm: day.timings[prayerId],
+    web: webRes.web || 0,
+    telegram,
+  };
 }
