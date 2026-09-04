@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v31';
+const CACHE = 'push-az-v32';
 const ASSETS = [
   '/',
   '/index.html',
@@ -21,6 +21,12 @@ const ASSETS = [
   '/icons/icon-alert-512.png',
   '/icons/apple-touch-icon.png',
   '/icons/favicon-64.png',
+  '/icons/namaz-fajr.png',
+  '/icons/namaz-dhuhr.png',
+  '/icons/namaz-asr.png',
+  '/icons/namaz-maghrib.png',
+  '/icons/namaz-isha.png',
+  '/icons/namaz-midnight.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -158,19 +164,30 @@ const NOTIF_BADGES = ['/icons/icon-192.png', '/icons/icon-maskable-192.png', '/i
 /** Krupnoye izobrazheniye (Android Chrome); iOS chasto ignoriruyet. */
 const NOTIF_LARGE_IMAGES = ['/icons/icon-maskable-512.png', '/icons/icon-512.png', '/icons/icon-alert-512.png'];
 
-function pickNotificationVisuals(reminderId, attempt, isFinal, urgent) {
-  const key = `${reminderId}\0${attempt}`;
+const NAMAZ_ICONS = {
+  fajr: '/icons/namaz-fajr.png',
+  dhuhr: '/icons/namaz-dhuhr.png',
+  asr: '/icons/namaz-asr.png',
+  maghrib: '/icons/namaz-maghrib.png',
+  isha: '/icons/namaz-isha.png',
+  midnight: '/icons/namaz-midnight.png',
+};
+
+function pickNotificationVisuals(reminderId, attempt, isFinal, urgent, tone) {
+  const key = `${reminderId}\0${attempt}\0${tone || ''}`;
   let icon = NOTIF_ICONS[swStableIndex(key, NOTIF_ICONS.length)];
   if (isFinal) {
-    const finalPool = ['/icons/icon-alert-512.png', '/icons/icon-maskable-512.png'];
-    icon = finalPool[swStableIndex(key + ':f', finalPool.length)];
-  } else if (urgent) {
-    const urgentPool = ['/icons/icon-alert-512.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
-    icon = urgentPool[swStableIndex(key + ':u', urgentPool.length)];
+    icon = '/icons/icon-alert-512.png';
   }
   const badge = NOTIF_BADGES[swStableIndex(key + ':b', NOTIF_BADGES.length)];
   const image = NOTIF_LARGE_IMAGES[swStableIndex(key + ':i', NOTIF_LARGE_IMAGES.length)];
   return { icon, badge, image };
+}
+
+function pickNamazVisuals(prayer) {
+  const id = String(prayer || '').toLowerCase();
+  const icon = NAMAZ_ICONS[id] || '/icons/icon-512.png';
+  return { icon, badge: icon, image: icon };
 }
 
 self.addEventListener('push', (event) => {
@@ -186,7 +203,7 @@ self.addEventListener('push', (event) => {
 
   if (data.type === 'namaz') {
     const title = data.title || 'push.az';
-    const { icon, badge, image } = pickNotificationVisuals('namaz-' + (data.prayer || 'x'), 1, false, true);
+    const { icon, badge, image } = pickNamazVisuals(data.prayer);
     event.waitUntil(
       self.registration.showNotification(title, {
         body: data.body || L.default_body,
@@ -222,7 +239,7 @@ self.addEventListener('push', (event) => {
   if (te) title = te + title;
 
   const rKey = String(reminderId || (data.tag != null && data.tag !== '' ? `tag-${data.tag}` : 'push'));
-  const { icon, badge, image } = pickNotificationVisuals(rKey, attempt, isFinal, urgent);
+  const { icon, badge, image } = pickNotificationVisuals(rKey, attempt, isFinal, urgent, data.tone);
 
   let composedBody = data.body || L.default_body;
   const newsLine =
