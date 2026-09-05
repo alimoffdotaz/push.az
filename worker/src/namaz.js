@@ -135,10 +135,31 @@ function cleanHm(raw) {
   return `${String(m[1]).padStart(2, '0')}:${m[2]}`;
 }
 
-function hmToMinutes(hm) {
+export function hmToMinutes(hm) {
   const [h, m] = hm.split(':').map(Number);
   if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
   return h * 60 + m;
+}
+
+export function addDaysToDateKey(dateKey, days) {
+  const m = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Number(days || 0)));
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * Fire window without wrapping the clock.
+ * dayOffsetMinutes=0 is the local calendar day of `nowMinutes`;
+ * 1440 is the next local day (needed when prayer-lead crosses midnight).
+ */
+export function isNamazInFireWindow(nowMinutes, prayerMinutes, leadMin, windowMin, dayOffsetMinutes = 0) {
+  if (!Number.isFinite(nowMinutes) || !Number.isFinite(prayerMinutes)) return false;
+  const lead = Number.isFinite(leadMin) ? leadMin : 0;
+  const win = Number.isFinite(windowMin) && windowMin > 0 ? windowMin : 0;
+  const fireAt = dayOffsetMinutes + prayerMinutes - lead;
+  const delta = nowMinutes - fireAt;
+  return delta >= 0 && delta < win;
 }
 
 function getZonedParts(nowMs, timeZone) {
@@ -173,9 +194,13 @@ function getZonedParts(nowMs, timeZone) {
   };
 }
 
-export async function fetchNamazTimings(lat, lng, unixSec) {
+export async function fetchNamazTimings(lat, lng, unixSec, dateKey) {
+  let datePath = String(unixSec);
+  if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    datePath = `${dateKey.slice(8, 10)}-${dateKey.slice(5, 7)}-${dateKey.slice(0, 4)}`;
+  }
   const url =
-    `https://api.aladhan.com/v1/timings/${unixSec}` +
+    `https://api.aladhan.com/v1/timings/${datePath}` +
     `?latitude=${encodeURIComponent(lat)}` +
     `&longitude=${encodeURIComponent(lng)}` +
     `&method=0&midnightMode=1`;
@@ -193,34 +218,57 @@ export async function fetchNamazTimings(lat, lng, unixSec) {
   return { timings, timezone, methodName: json.data.meta?.method?.name || '' };
 }
 
-export async function getTodayNamazForUser(env, userId, lat, lng, timezoneHint, nowMs) {
-  const tzGuess = timezoneHint || 'UTC';
-  const { dateKey } = getZonedParts(nowMs, tzGuess);
+const NAMAZ_CACHE_TTL_MS = 18 * 60 * 60 * 1000;
+
+async function readNamazCache(env, userId, dateKey, nowMs, tzFallback) {
   const cached = await env.DB.prepare(
     `SELECT timings_json, timezone, fetched_at FROM namaz_day_cache WHERE user_id = ?1 AND date_key = ?2`,
   )
     .bind(userId, dateKey)
     .first();
-  if (cached?.timings_json && nowMs - Number(cached.fetched_at || 0) < 18 * 60 * 60 * 1000) {
+  if (cached?.timings_json && nowMs - Number(cached.fetched_at || 0) < NAMAZ_CACHE_TTL_MS) {
     try {
       return {
         dateKey,
         timings: JSON.parse(cached.timings_json),
-        timezone: cached.timezone || tzGuess,
+        timezone: cached.timezone || tzFallback || 'UTC',
         cached: true,
       };
     } catch {}
   }
+  return null;
+}
 
-  const fetched = await fetchNamazTimings(lat, lng, Math.floor(nowMs / 1000));
-  const tz = fetched.timezone || tzGuess;
-  const zoned = getZonedParts(nowMs, tz);
+async function writeNamazCache(env, userId, dateKey, timings, timezone, nowMs) {
   await env.DB.prepare(
     `INSERT OR REPLACE INTO namaz_day_cache (user_id, date_key, timings_json, timezone, fetched_at)
      VALUES (?1, ?2, ?3, ?4, ?5)`,
   )
-    .bind(userId, zoned.dateKey, JSON.stringify(fetched.timings), tz, nowMs)
+    .bind(userId, dateKey, JSON.stringify(timings), timezone, nowMs)
     .run();
+}
+
+export async function getNamazForUserOnDate(env, userId, lat, lng, timezoneHint, nowMs, dateKey) {
+  const tzGuess = timezoneHint || 'UTC';
+  const hit = await readNamazCache(env, userId, dateKey, nowMs, tzGuess);
+  if (hit) return hit;
+
+  const fetched = await fetchNamazTimings(lat, lng, Math.floor(nowMs / 1000), dateKey);
+  const tz = fetched.timezone || tzGuess;
+  await writeNamazCache(env, userId, dateKey, fetched.timings, tz, nowMs);
+  return { dateKey, timings: fetched.timings, timezone: tz, cached: false };
+}
+
+export async function getTodayNamazForUser(env, userId, lat, lng, timezoneHint, nowMs) {
+  const tzGuess = timezoneHint || 'UTC';
+  const { dateKey } = getZonedParts(nowMs, tzGuess);
+  const hit = await readNamazCache(env, userId, dateKey, nowMs, tzGuess);
+  if (hit) return hit;
+
+  const fetched = await fetchNamazTimings(lat, lng, Math.floor(nowMs / 1000));
+  const tz = fetched.timezone || tzGuess;
+  const zoned = getZonedParts(nowMs, tz);
+  await writeNamazCache(env, userId, zoned.dateKey, fetched.timings, tz, nowMs);
   return { dateKey: zoned.dateKey, timings: fetched.timings, timezone: tz, cached: false };
 }
 
@@ -295,7 +343,7 @@ export async function sendNamazPush(env, vapid, userId, lang, prayerId, copy) {
 /**
  * Cron: dlya vklyuchennykh userov, esli lokalnaya minuta popadaet v okno namaza — odin push.
  */
-export async function runNamazScheduler(env, vapid, sendTelegramFn) {
+export async function runNamazScheduler(env, vapid, sendTelegramFn, nowMs = Date.now()) {
   let rows;
   try {
     rows = await env.DB.prepare(
@@ -314,13 +362,17 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
   const list = rows.results || [];
   if (!list.length) return;
 
-  const nowMs = Date.now();
   const WINDOW_MIN = 2;
 
   for (const u of list) {
     try {
-      const prayers = normalizeNamazPrayers(JSON.parse(u.namaz_prayers || '[]'));
-      if (!prayers.length) continue;
+      let prayers = [];
+      try {
+        prayers = normalizeNamazPrayers(JSON.parse(u.namaz_prayers || '[]'));
+      } catch {
+        prayers = [];
+      }
+      if (!prayers.length) prayers = [...NAMAZ_PRAYER_IDS];
       const day = await getTodayNamazForUser(
         env,
         u.id,
@@ -333,27 +385,53 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
       const lang = u.lang || 'ru';
       const leadMin = normalizeLeadMin(u.namaz_lead_min);
 
-      for (const prayerId of prayers) {
-        const hm = day.timings[prayerId];
-        if (!hm) continue;
-        const pMin = hmToMinutes(hm);
-        if (pMin == null) continue;
-        const target = ((pMin - leadMin) % 1440 + 1440) % 1440;
-        let delta = zoned.minutes - target;
-        if (delta < 0) delta += 1440;
-        if (delta >= WINDOW_MIN) continue;
-        if (await alreadySent(env, u.id, day.dateKey, prayerId)) continue;
-
-        const copy = buildNamazCopy(lang, prayerId, day.timings);
-        await sendNamazPush(env, vapid, u.id, lang, prayerId, copy);
-        if (typeof sendTelegramFn === 'function') {
+      const days = [{ day, offset: 0 }];
+      // Lead before an early-morning prayer (typical Ja'fari midnight ~00:00)
+      // lives on the previous calendar day. Load tomorrow near end-of-day.
+      if (zoned.minutes + leadMin + WINDOW_MIN >= 1440) {
+        const tomorrowKey = addDaysToDateKey(day.dateKey, 1);
+        if (tomorrowKey) {
           try {
-            await sendTelegramFn(env, u.id, copy.title, copy.body, lang);
+            const tomorrow = await getNamazForUserOnDate(
+              env,
+              u.id,
+              Number(u.namaz_lat),
+              Number(u.namaz_lng),
+              day.timezone || u.namaz_timezone,
+              nowMs,
+              tomorrowKey,
+            );
+            days.push({ day: tomorrow, offset: 1440 });
           } catch (err) {
-            console.warn('[namaz] tg', err?.message || err);
+            console.warn('[namaz] tomorrow', err?.message || err);
           }
         }
-        await markSent(env, u.id, day.dateKey, prayerId, nowMs);
+      }
+
+      for (const { day: d, offset } of days) {
+        for (const prayerId of prayers) {
+          const hm = d.timings[prayerId];
+          if (!hm) continue;
+          const pMin = hmToMinutes(hm);
+          if (pMin == null) continue;
+          if (!isNamazInFireWindow(zoned.minutes, pMin, leadMin, WINDOW_MIN, offset)) continue;
+          if (await alreadySent(env, u.id, d.dateKey, prayerId)) continue;
+
+          const copy = buildNamazCopy(lang, prayerId, d.timings);
+          const webResult = await sendNamazPush(env, vapid, u.id, lang, prayerId, copy);
+          let tgSent = 0;
+          if (typeof sendTelegramFn === 'function') {
+            try {
+              const tg = await sendTelegramFn(env, u.id, copy.title, copy.body, lang);
+              tgSent = Number(tg?.sent) || 0;
+            } catch (err) {
+              console.warn('[namaz] tg', err?.message || err);
+            }
+          }
+          if ((webResult?.web || 0) > 0 || tgSent > 0) {
+            await markSent(env, u.id, d.dateKey, prayerId, nowMs);
+          }
+        }
       }
     } catch (err) {
       console.warn('[namaz] user', u.id, err?.message || err);
