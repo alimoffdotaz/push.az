@@ -475,7 +475,7 @@ export async function handleMe(request, env) {
   let namaz = parseNamazSettings(null);
   try {
     const rowN = await env.DB.prepare(
-      `SELECT news_categories, namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min
+      `SELECT news_categories, namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min, namaz_fajr_pre1h
        FROM users WHERE id = ?1`,
     )
       .bind(user.userId)

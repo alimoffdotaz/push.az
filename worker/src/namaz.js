@@ -39,6 +39,8 @@ const PRAYER_LABEL = {
     body: (name, hm) => `Время намаза (джафари, Кум): ${name} — ${hm}.`,
     body_midnight: (hm) =>
       `Полночь по джафари (середина заката–фаджра): ${hm}.\nДо этого — время ночных намазов.`,
+    fajr_pre1h_title: (hm) => `Фаджр через час · ${hm}`,
+    fajr_pre1h_body: (hm) => `Через час утренний намаз (фаджр) — ${hm}.`,
   },
   az: {
     fajr: 'Fəcr',
@@ -51,6 +53,8 @@ const PRAYER_LABEL = {
     body: (name, hm) => `Namaz vaxtı (Cəfəri, Qum): ${name} — ${hm}.`,
     body_midnight: (hm) =>
       `Cəfəri geceyarı (qürub–fəcr ortası): ${hm}.\nBuna qədər gecə namazları vaxtıdır.`,
+    fajr_pre1h_title: (hm) => `Fəcr bir saat sonra · ${hm}`,
+    fajr_pre1h_body: (hm) => `Bir saat sonra səhər namazı (fəcr) — ${hm}.`,
   },
   en: {
     fajr: 'Fajr',
@@ -63,6 +67,8 @@ const PRAYER_LABEL = {
     body: (name, hm) => `Prayer time (Ja'fari, Qum): ${name} — ${hm}.`,
     body_midnight: (hm) =>
       `Ja'fari midnight (midpoint sunset–Fajr): ${hm}.\nNight prayers are until this time.`,
+    fajr_pre1h_title: (hm) => `Fajr in one hour · ${hm}`,
+    fajr_pre1h_body: (hm) => `Morning prayer (Fajr) is in one hour — ${hm}.`,
   },
 };
 
@@ -108,6 +114,7 @@ export function parseNamazSettings(row) {
       timezone: '',
       prayers: [...NAMAZ_PRAYER_IDS],
       leadMin: 10,
+      fajrPre1h: true,
     };
   }
   let prayers = [...NAMAZ_PRAYER_IDS];
@@ -125,6 +132,7 @@ export function parseNamazSettings(row) {
     timezone: row.namaz_timezone || '',
     prayers,
     leadMin: normalizeLeadMin(row.namaz_lead_min),
+    fajrPre1h: row.namaz_fajr_pre1h == null ? true : Number(row.namaz_fajr_pre1h) === 1,
   };
 }
 
@@ -229,6 +237,12 @@ function namazTitlePrefix(prayerId) {
   return `🕌${e} `;
 }
 
+function inNamazWindow(nowMin, targetMin, windowMin) {
+  let delta = nowMin - targetMin;
+  if (delta < 0) delta += 1440;
+  return delta < windowMin;
+}
+
 function buildNamazCopy(lang, prayerId, timings) {
   const L = PRAYER_LABEL[pickLang(lang)] || PRAYER_LABEL.ru;
   const hm = timings[prayerId] || '';
@@ -238,6 +252,15 @@ function buildNamazCopy(lang, prayerId, timings) {
     return { title: prefix + L.title(name, hm), body: L.body_midnight(hm) };
   }
   return { title: prefix + L.title(name, hm), body: L.body(name, hm) };
+}
+
+function buildFajrPre1hCopy(lang, timings) {
+  const L = PRAYER_LABEL[pickLang(lang)] || PRAYER_LABEL.ru;
+  const hm = timings.fajr || '';
+  return {
+    title: namazTitlePrefix('fajr') + L.fajr_pre1h_title(hm),
+    body: L.fajr_pre1h_body(hm),
+  };
 }
 
 async function alreadySent(env, userId, dateKey, prayer) {
@@ -299,7 +322,7 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
   let rows;
   try {
     rows = await env.DB.prepare(
-      `SELECT id, lang, namaz_lat, namaz_lng, namaz_timezone, namaz_prayers, namaz_lead_min
+      `SELECT id, lang, namaz_lat, namaz_lng, namaz_timezone, namaz_prayers, namaz_lead_min, namaz_fajr_pre1h
        FROM users
        WHERE namaz_enabled = 1
          AND namaz_lat IS NOT NULL
@@ -332,20 +355,11 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
       const zoned = getZonedParts(nowMs, day.timezone || u.namaz_timezone || 'UTC');
       const lang = u.lang || 'ru';
       const leadMin = normalizeLeadMin(u.namaz_lead_min);
+      const fajrPre1h = u.namaz_fajr_pre1h == null ? true : Number(u.namaz_fajr_pre1h) === 1;
 
-      for (const prayerId of prayers) {
-        const hm = day.timings[prayerId];
-        if (!hm) continue;
-        const pMin = hmToMinutes(hm);
-        if (pMin == null) continue;
-        const target = ((pMin - leadMin) % 1440 + 1440) % 1440;
-        let delta = zoned.minutes - target;
-        if (delta < 0) delta += 1440;
-        if (delta >= WINDOW_MIN) continue;
-        if (await alreadySent(env, u.id, day.dateKey, prayerId)) continue;
-
-        const copy = buildNamazCopy(lang, prayerId, day.timings);
-        await sendNamazPush(env, vapid, u.id, lang, prayerId, copy);
+      const fire = async (eventId, copy) => {
+        if (await alreadySent(env, u.id, day.dateKey, eventId)) return;
+        await sendNamazPush(env, vapid, u.id, lang, eventId, copy);
         if (typeof sendTelegramFn === 'function') {
           try {
             await sendTelegramFn(env, u.id, copy.title, copy.body, lang);
@@ -353,7 +367,28 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
             console.warn('[namaz] tg', err?.message || err);
           }
         }
-        await markSent(env, u.id, day.dateKey, prayerId, nowMs);
+        await markSent(env, u.id, day.dateKey, eventId, nowMs);
+      };
+
+      for (const prayerId of prayers) {
+        const hm = day.timings[prayerId];
+        if (!hm) continue;
+        const pMin = hmToMinutes(hm);
+        if (pMin == null) continue;
+        const target = ((pMin - leadMin) % 1440 + 1440) % 1440;
+        if (!inNamazWindow(zoned.minutes, target, WINDOW_MIN)) continue;
+        await fire(prayerId, buildNamazCopy(lang, prayerId, day.timings));
+      }
+
+      // Extra: hour before Fajr (skip if lead is already 60 min — same moment).
+      if (fajrPre1h && leadMin !== 60 && day.timings.fajr) {
+        const fajrMin = hmToMinutes(day.timings.fajr);
+        if (fajrMin != null) {
+          const target = ((fajrMin - 60) % 1440 + 1440) % 1440;
+          if (inNamazWindow(zoned.minutes, target, WINDOW_MIN)) {
+            await fire('fajr_pre1h', buildFajrPre1hCopy(lang, day.timings));
+          }
+        }
       }
     } catch (err) {
       console.warn('[namaz] user', u.id, err?.message || err);
@@ -384,7 +419,7 @@ async function reverseGeocodeCity(lat, lng, lang) {
 
 export async function handleGetNamaz(request, env, user) {
   const row = await env.DB.prepare(
-    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min
+    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min, namaz_fajr_pre1h
      FROM users WHERE id = ?1`,
   )
     .bind(user.userId)
@@ -426,6 +461,7 @@ export async function handleSetNamaz(request, env, user) {
   let prayers = normalizeNamazPrayers(body.prayers);
   if (!prayers.length) prayers = [...NAMAZ_PRAYER_IDS];
   const leadMin = normalizeLeadMin(body.leadMin ?? body.lead_min);
+  const fajrPre1h = body.fajrPre1h !== undefined ? !!body.fajrPre1h : true;
 
   let city = typeof body.city === 'string' ? body.city.slice(0, 120) : '';
   let timezone = typeof body.timezone === 'string' ? body.timezone.slice(0, 80) : '';
@@ -456,8 +492,9 @@ export async function handleSetNamaz(request, env, user) {
        namaz_city = ?4,
        namaz_timezone = ?5,
        namaz_prayers = ?6,
-       namaz_lead_min = ?7
-     WHERE id = ?8`,
+       namaz_lead_min = ?7,
+       namaz_fajr_pre1h = ?8
+     WHERE id = ?9`,
   )
     .bind(
       enabled ? 1 : 0,
@@ -467,12 +504,13 @@ export async function handleSetNamaz(request, env, user) {
       timezone || null,
       JSON.stringify(prayers),
       leadMin,
+      fajrPre1h ? 1 : 0,
       user.userId,
     )
     .run();
 
   const row = await env.DB.prepare(
-    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min
+    `SELECT namaz_enabled, namaz_lat, namaz_lng, namaz_city, namaz_timezone, namaz_prayers, namaz_lead_min, namaz_fajr_pre1h
      FROM users WHERE id = ?1`,
   )
     .bind(user.userId)

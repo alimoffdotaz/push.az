@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v33';
+const CACHE = 'push-az-v34';
 const ASSETS = [
   '/',
   '/index.html',
@@ -186,7 +186,8 @@ function pickNotificationVisuals(reminderId, attempt, isFinal, urgent, tone) {
 
 function pickNamazVisuals(prayer) {
   const id = String(prayer || '').toLowerCase();
-  const icon = NAMAZ_ICONS[id] || '/icons/icon-512.png';
+  const iconId = id === 'fajr_pre1h' ? 'fajr' : id;
+  const icon = NAMAZ_ICONS[iconId] || '/icons/icon-512.png';
   return { icon, badge: icon, image: icon };
 }
 

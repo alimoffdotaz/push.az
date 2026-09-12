@@ -664,6 +664,7 @@ function namazFromUser() {
     timezone: n?.timezone || '',
     prayers,
     leadMin: Number.isFinite(Number(n?.leadMin)) ? Number(n.leadMin) : 10,
+    fajrPre1h: n?.fajrPre1h !== false,
   };
 }
 
@@ -732,6 +733,8 @@ function fillNamazSettings() {
   const n = namazFromUser();
   const en = document.getElementById('namaz-enabled');
   if (en) en.checked = n.enabled;
+  const pre = document.getElementById('namaz-fajr-pre1h');
+  if (pre) pre.checked = n.fajrPre1h !== false;
   fillNamazLeadSelect();
   renderNamazPrayers();
   updateNamazLocLabel();
@@ -787,6 +790,7 @@ async function locateNamaz() {
               timezone,
               prayers: prayers.length ? prayers : prev.prayers,
               leadMin: Number(document.getElementById('namaz-lead')?.value ?? prev.leadMin),
+              fajrPre1h: document.getElementById('namaz-fajr-pre1h')?.checked !== false,
             },
           });
           state.user = { ...state.user, namaz: r.namaz };
@@ -1845,6 +1849,7 @@ async function saveSettings(e) {
             timezone: prev.timezone,
             prayers,
             leadMin,
+            fajrPre1h: document.getElementById('namaz-fajr-pre1h')?.checked !== false,
           },
         });
         state.user = { ...state.user, namaz: r.namaz };
