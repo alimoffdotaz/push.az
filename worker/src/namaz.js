@@ -237,10 +237,61 @@ function namazTitlePrefix(prayerId) {
   return `🕌${e} `;
 }
 
-function inNamazWindow(nowMin, targetMin, windowMin) {
-  let delta = nowMin - targetMin;
-  if (delta < 0) delta += 1440;
-  return delta < windowMin;
+/**
+ * Minutes from local midnight of the timetable date until the alert.
+ * Ja'fari midnight reported as 00:xx is the night after that date
+ * (midpoint of sunset → next Fajr), so it belongs to the next calendar day.
+ * Other prayers are clock times on the timetable date itself.
+ * Result may be >= 1440 when the alert falls on the following day.
+ */
+export function namazAlertFromTimetableStart(prayerId, pMin, leadMin) {
+  const occursNextDay = prayerId === 'midnight' && pMin < 12 * 60;
+  return pMin - leadMin + (occursNextDay ? 1440 : 0);
+}
+
+/**
+ * `timetableDayOffset` 0 = this timetable's calendar date, 1 = the next date.
+ * The window does not wrap across midnight: a 23:59 alert must not match 00:00
+ * on the following dateKey (that would mark the next occurrence sent a day early).
+ */
+export function isNamazAlertDue(nowMin, alertFromTimetableStart, timetableDayOffset, windowMin) {
+  const onThisDay = alertFromTimetableStart - timetableDayOffset * 1440;
+  if (onThisDay < 0 || onThisDay >= 1440) return false;
+  const delta = nowMin - onThisDay;
+  return delta >= 0 && delta < windowMin;
+}
+
+export function addDaysToDateKey(dateKey, days) {
+  const [y, m, d] = String(dateKey || '').split('-').map(Number);
+  if (!y || !m || !d) return dateKey;
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Unix seconds at 12:00 in `timeZone` on the Gregorian `dateKey`. */
+export function localNoonUnix(dateKey, timeZone) {
+  const tz = timeZone || 'UTC';
+  const [y, m, d] = String(dateKey || '').split('-').map(Number);
+  if (!y || !m || !d) return Math.floor(Date.now() / 1000);
+  let t = Date.UTC(y, m - 1, d, 12, 0, 0);
+  const got = getZonedParts(t, tz);
+  if (got.dateKey && got.dateKey !== dateKey) {
+    const [gy, gm, gd] = got.dateKey.split('-').map(Number);
+    const deltaDays = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(gy, gm - 1, gd)) / 86400000);
+    t += deltaDays * 86400000;
+  }
+  const aligned = getZonedParts(t, tz);
+  t += (12 * 60 - aligned.minutes) * 60 * 1000;
+  const noon = getZonedParts(t, tz);
+  if (noon.dateKey && noon.dateKey !== dateKey) {
+    const [py, pm, pd] = noon.dateKey.split('-').map(Number);
+    const deltaDays = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(py, pm - 1, pd)) / 86400000);
+    t += deltaDays * 86400000;
+  }
+  return Math.floor(t / 1000);
 }
 
 function buildNamazCopy(lang, prayerId, timings) {
@@ -278,6 +329,33 @@ async function markSent(env, userId, dateKey, prayer, nowMs) {
   )
     .bind(userId, dateKey, prayer, nowMs)
     .run();
+}
+
+/** Timings for an explicit local date. Cached rows stay valid; the clock time does not move. */
+async function getNamazTimingsForDate(env, userId, lat, lng, timeZone, dateKey, nowMs) {
+  const cached = await env.DB.prepare(
+    `SELECT timings_json, timezone FROM namaz_day_cache WHERE user_id = ?1 AND date_key = ?2`,
+  )
+    .bind(userId, dateKey)
+    .first();
+  if (cached?.timings_json) {
+    try {
+      return {
+        dateKey,
+        timings: JSON.parse(cached.timings_json),
+        timezone: cached.timezone || timeZone || 'UTC',
+      };
+    } catch {}
+  }
+  const fetched = await fetchNamazTimings(lat, lng, localNoonUnix(dateKey, timeZone || 'UTC'));
+  const tz = fetched.timezone || timeZone || 'UTC';
+  await env.DB.prepare(
+    `INSERT OR REPLACE INTO namaz_day_cache (user_id, date_key, timings_json, timezone, fetched_at)
+     VALUES (?1, ?2, ?3, ?4, ?5)`,
+  )
+    .bind(userId, dateKey, JSON.stringify(fetched.timings), tz, nowMs)
+    .run();
+  return { dateKey, timings: fetched.timings, timezone: tz };
 }
 
 export async function sendNamazPush(env, vapid, userId, lang, prayerId, copy) {
@@ -357,8 +435,8 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
       const leadMin = normalizeLeadMin(u.namaz_lead_min);
       const fajrPre1h = u.namaz_fajr_pre1h == null ? true : Number(u.namaz_fajr_pre1h) === 1;
 
-      const fire = async (eventId, copy) => {
-        if (await alreadySent(env, u.id, day.dateKey, eventId)) return;
+      const fire = async (eventId, copy, dateKey) => {
+        if (await alreadySent(env, u.id, dateKey, eventId)) return;
         await sendNamazPush(env, vapid, u.id, lang, eventId, copy);
         if (typeof sendTelegramFn === 'function') {
           try {
@@ -367,7 +445,7 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
             console.warn('[namaz] tg', err?.message || err);
           }
         }
-        await markSent(env, u.id, day.dateKey, eventId, nowMs);
+        await markSent(env, u.id, dateKey, eventId, nowMs);
       };
 
       for (const prayerId of prayers) {
@@ -375,18 +453,41 @@ export async function runNamazScheduler(env, vapid, sendTelegramFn) {
         if (!hm) continue;
         const pMin = hmToMinutes(hm);
         if (pMin == null) continue;
-        const target = ((pMin - leadMin) % 1440 + 1440) % 1440;
-        if (!inNamazWindow(zoned.minutes, target, WINDOW_MIN)) continue;
-        await fire(prayerId, buildNamazCopy(lang, prayerId, day.timings));
+        const alertAbs = namazAlertFromTimetableStart(prayerId, pMin, leadMin);
+        if (!isNamazAlertDue(zoned.minutes, alertAbs, 0, WINDOW_MIN)) continue;
+        await fire(prayerId, buildNamazCopy(lang, prayerId, day.timings), day.dateKey);
       }
 
       // Extra: hour before Fajr (skip if lead is already 60 min — same moment).
       if (fajrPre1h && leadMin !== 60 && day.timings.fajr) {
         const fajrMin = hmToMinutes(day.timings.fajr);
         if (fajrMin != null) {
-          const target = ((fajrMin - 60) % 1440 + 1440) % 1440;
-          if (inNamazWindow(zoned.minutes, target, WINDOW_MIN)) {
-            await fire('fajr_pre1h', buildFajrPre1hCopy(lang, day.timings));
+          const alertAbs = fajrMin - 60;
+          if (isNamazAlertDue(zoned.minutes, alertAbs, 0, WINDOW_MIN)) {
+            await fire('fajr_pre1h', buildFajrPre1hCopy(lang, day.timings), day.dateKey);
+          }
+        }
+      }
+
+      // Midnight 00:xx whose lead still lands after midnight is invisible on
+      // today's row (that instant belongs to yesterday's timetable).
+      // Only the morning can match that alert; afternoon ticks skip the extra read.
+      if (prayers.includes('midnight') && zoned.minutes < 12 * 60 + WINDOW_MIN) {
+        const yKey = addDaysToDateKey(day.dateKey, -1);
+        const prev = await getNamazTimingsForDate(
+          env,
+          u.id,
+          Number(u.namaz_lat),
+          Number(u.namaz_lng),
+          day.timezone || u.namaz_timezone || 'UTC',
+          yKey,
+          nowMs,
+        );
+        const pMin = hmToMinutes(prev?.timings?.midnight || '');
+        if (pMin != null) {
+          const alertAbs = namazAlertFromTimetableStart('midnight', pMin, leadMin);
+          if (isNamazAlertDue(zoned.minutes, alertAbs, 1, WINDOW_MIN)) {
+            await fire('midnight', buildNamazCopy(lang, 'midnight', prev.timings), yKey);
           }
         }
       }
