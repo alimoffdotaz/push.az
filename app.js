@@ -1128,7 +1128,7 @@ function updatePushStatusPill() {
 // ============================================================================
 
 async function syncReminderToBackend(r) {
-  if (!state.workerUrl) return;
+  if (!state.workerUrl || !state.sessionToken) return false;
   try {
     await api('/api/reminders', {
       method: 'POST',
@@ -1141,8 +1141,19 @@ async function syncReminderToBackend(r) {
         tone: r.tone || 'friendly',
       },
     });
+    if (r.pendingSync) {
+      const latest = await db.get(r.id);
+      if (latest) {
+        delete latest.pendingSync;
+        await db.put(latest);
+      }
+      const current = state.reminders.find((x) => x.id === r.id);
+      if (current) delete current.pendingSync;
+    }
+    return true;
   } catch (err) {
     console.warn('sync reminder failed:', err);
+    return false;
   }
 }
 
@@ -1204,6 +1215,7 @@ async function syncAllReminders() {
       }
       // Udalyaem lokalnye reminder'y, kotorykh bolshe net na servere (udaleno s drugogo ustr.)
       for (const l of localAll) {
+        if (l.pendingSync) continue;
         if (!byId.has(l.id)) {
           await db.delete(l.id);
         }
@@ -1420,6 +1432,7 @@ async function addReminder(e) {
     repeat,
     tone,
     createdAt: Date.now(),
+    pendingSync: true,
   };
 
   try {
