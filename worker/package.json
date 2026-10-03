@@ -6,6 +6,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "test": "node --test",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "db:init": "wrangler d1 execute push-az-db --file=./schema.sql",
