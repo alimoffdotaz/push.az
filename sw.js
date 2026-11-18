@@ -1,6 +1,6 @@
 import { config } from '/db.js';
 
-const CACHE = 'push-az-v34';
+const CACHE = 'push-az-v35';
 const ASSETS = [
   '/',
   '/index.html',
@@ -245,16 +245,6 @@ self.addEventListener('push', (event) => {
   const { icon, badge, image } = pickNotificationVisuals(rKey, attempt, isFinal, urgent, data.tone);
 
   let composedBody = data.body || L.default_body;
-  const newsLine =
-    typeof data.newsLine === 'string' && data.newsLine.trim() ? data.newsLine.trim() : '';
-  if (isReminder && newsLine) {
-    const prefixes = Array.isArray(L.news_line_prefixes) && L.news_line_prefixes.length
-      ? L.news_line_prefixes
-      : [L.news_line_prefix || ''];
-    const pi = swStableIndex(`${rKey}:${newsLine}`, prefixes.length);
-    const np = (prefixes[pi] && prefixes[pi] + ' ') || '';
-    composedBody = `${composedBody}\n${np}${newsLine}`;
-  }
   if (composedBody.length > 420) {
     composedBody = composedBody.slice(0, 417) + '...';
   }

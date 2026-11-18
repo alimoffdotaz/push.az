@@ -634,36 +634,20 @@ async function processOneReminder(env, r, vapid, now) {
 
   const reminder = { id: r.id, title: r.title, note: r.note, tone: r.tone, fire_at: r.fire_at };
 
-  // Yazyk i kategorii "novostey" dlya push / TG
   let lang = 'ru';
-  let newsCategories = [];
   try {
-    const u = await env.DB.prepare(`SELECT lang, news_categories FROM users WHERE id = ?1`)
+    const u = await env.DB.prepare(`SELECT lang FROM users WHERE id = ?1`)
       .bind(r.user_id)
       .first();
     if (u?.lang) lang = u.lang;
-    if (u?.news_categories) {
-      try {
-        const p = JSON.parse(u.news_categories);
-        if (Array.isArray(p)) newsCategories = p;
-      } catch {
-        newsCategories = [];
-      }
-    }
   } catch {}
 
   const pendingCount = await countPendingRemindersForUser(env, r.user_id);
-  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount, {
-    newsCategories,
-    // Unikal'nost' na kazhdyy konkretnyy "vykhod" schedulera (eskalyatsii, srezы povtora)
-    newsSeedExtra: [r.next_attempt_at, r.send_count, r.fire_at, r.updated_at].map(String).join(':'),
-  });
-  const newsLine = built.newsLine || null;
+  const built = await buildPushBody(env, reminder, attempt, lang, now, MAX_ATTEMPTS, pendingCount);
 
-  // Parallelno shlyom v Telegram (esli user'a privyazal)
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS, newsLine);
+      await tgSendReminderToUser(env, r.user_id, reminder, built.text, attempt, MAX_ATTEMPTS);
     } catch (err) {
       console.warn('[tg] send failed for reminder', r.id, err?.message || err);
     }
@@ -680,7 +664,6 @@ async function processOneReminder(env, r, vapid, now) {
         reminderId: r.id,
         title: r.title,
         body: built.text,
-        newsLine: newsLine || undefined,
         attempt,
         maxAttempts: MAX_ATTEMPTS,
         fireAt: r.fire_at,
